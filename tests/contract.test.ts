@@ -318,6 +318,27 @@ describe("Token Worker", () => {
       const buyerBalance1 = await accountBalanceMina(buyerPublicKey);
       console.log("Buyer balance before buy:", buyerBalance1);
 
+      console.log("Preparing transfer tx");
+
+      const transferTx = await Mina.transaction(
+        {
+          sender: buyerPublicKey,
+          fee: await fee(),
+        },
+        async () => {
+          AccountUpdate.fundNewAccount(buyerPublicKey, 1);
+          await zkApp.transfer(
+            offerPublicKey,
+            buyerPublicKey,
+            UInt64.from(10e9)
+          );
+        }
+      );
+      await transferTx.prove();
+      transferTx.sign([buyerPrivateKey, offerPrivateKey]);
+      //console.log("Transfer tx:", transferTx.toPretty());
+      await sendTx(transferTx, "transfer"); // should fail
+
       console.log("Preparing buy tx");
 
       const buyTx = await Mina.transaction(

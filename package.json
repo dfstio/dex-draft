@@ -1,0 +1,44 @@
+{
+  "name": "dex-draft",
+  "version": "0.1.0",
+  "author": "DFST",
+  "scripts": {
+    "test": "jest",
+    "local": "jest --chain=local --cloud=local --deploy=true",
+    "offer": "jest --chain=local --cloud=local --deploy=true  --send=false",
+    "lightnet.deploy": "jest --chain=lightnet --cloud=local --deploy=true --send=false",
+    "lightnet.run": "jest --chain=lightnet --cloud=local --deploy=false",
+    "zeko.deploy": "jest --chain=zeko --deploy=true --cloud=local --send=false",
+    "zeko.run": "jest --chain=zeko --deploy=false",
+    "devnet.deploy": "jest --chain=devnet --cloud=local --deploy=true --send=false",
+    "devnet.local": "jest --chain=devnet --cloud=local --deploy=false --send=true",
+    "devnet.run": "jest --chain=devnet --deploy=false --compile=false"
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^22.4.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.4",
+    "typescript": "^5.5.4"
+  },
+  "packageManager": "yarn@4.4.0",
+  "dependencies": {
+    "o1js": "^1.6.0",
+    "zkcloudworker": "^0.12.2"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "slowTestThreshold": 1500,
+    "testTimeout": 10800000,
+    "bail": true,
+    "verbose": true,
+    "roots": [
+      "tests"
+    ],
+    "setupFilesAfterEnv": [
+      "./jest-config.ts"
+    ]
+  }
+}

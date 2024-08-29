@@ -45,22 +45,41 @@ export class OfferContract extends SmartContract {
     await tokenContract.transfer(sender, this.address, amount);
   }
 
-  @method async buy() {
+  @method.returns(AccountUpdate) async buy(buyer: PublicKey) {
     const amount = this.amount.getAndRequireEquals();
     const owner = this.owner.getAndRequireEquals();
     const price = this.price.getAndRequireEquals();
 
-    const sender = this.sender.getUnconstrained();
-    const senderUpdate = AccountUpdate.createSigned(sender);
-    senderUpdate.send({ to: owner, amount: price });
-    senderUpdate.body.useFullCommitment = Bool(true);
+    const buyerUpdate = AccountUpdate.createSigned(buyer);
+    buyerUpdate.send({ to: owner, amount: price });
+    buyerUpdate.body.useFullCommitment = Bool(true);
 
-    let receiverAU = this.send({ to: sender, amount });
+    let receiverAU = this.send({ to: buyer, amount });
     receiverAU.body.mayUseToken = AccountUpdate.MayUseToken.InheritFromParent;
     receiverAU.body.useFullCommitment = Bool(true);
 
     this.price.set(UInt64.from(0));
     this.amount.set(UInt64.from(0));
     this.owner.set(PublicKey.empty());
+    return buyerUpdate;
+  }
+
+  @method.returns(PublicKey) async settle(buyer: PublicKey, payer: PublicKey) {
+    const amount = this.amount.getAndRequireEquals();
+    const owner = this.owner.getAndRequireEquals();
+    const price = this.price.getAndRequireEquals();
+
+    //const payerUpdate = AccountUpdate.create(payer);
+    //payerUpdate.send({ to: owner, amount: price });
+    //payerUpdate.body.useFullCommitment = Bool(true);
+
+    let receiverAU = this.send({ to: buyer, amount });
+    receiverAU.body.mayUseToken = AccountUpdate.MayUseToken.InheritFromParent;
+    receiverAU.body.useFullCommitment = Bool(true);
+
+    //this.price.set(UInt64.from(0));
+    //this.amount.set(UInt64.from(0));
+    //this.owner.set(PublicKey.empty());
+    return owner;
   }
 }

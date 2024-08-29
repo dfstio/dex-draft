@@ -28,6 +28,7 @@ import { zkcloudworker } from "..";
 import { FungibleToken } from "../src/FungibleToken";
 import { FungibleTokenAdmin } from "../src/FungibleTokenAdmin";
 import { OfferContract } from "../src/offer";
+import { BidContract } from "../src/bid";
 import { USER_PRIVATE_KEY, USER_PUBLIC_KEY, TOKEN_ADDRESS } from "../env.json";
 import packageJson from "../package.json";
 import { JWT } from "../env.json";
@@ -57,6 +58,8 @@ const buyerPrivateKey = PrivateKey.random();
 const buyerPublicKey = buyerPrivateKey.toPublicKey();
 const offerPrivateKey = PrivateKey.random();
 const offerPublicKey = offerPrivateKey.toPublicKey();
+const bidPrivateKey = PrivateKey.random();
+const bidPublicKey = bidPrivateKey.toPublicKey();
 const contractPrivateKey = PrivateKey.random();
 const contractPublicKey =
   chain === "devnet"
@@ -69,6 +72,7 @@ const tokenId = zkApp.deriveTokenId();
 let contractVerificationKey: VerificationKey;
 let adminVerificationKey: VerificationKey;
 let offerVerificationKey: VerificationKey;
+let bidVerificationKey: VerificationKey;
 let blockchainInitialized = false;
 
 describe("Token Worker", () => {
@@ -92,6 +96,7 @@ describe("Token Worker", () => {
 
     console.log("contract address:", contractPublicKey.toBase58());
     console.log("offer contract address:", offerPublicKey.toBase58());
+    console.log("bid contract address:", bidPublicKey.toBase58());
     console.log("admin contract address:", adminPublicKey.toBase58());
     console.log("user address:", userPublicKey.toBase58());
     console.log("buyer address:", buyerPublicKey.toBase58());
@@ -124,6 +129,11 @@ describe("Token Worker", () => {
         {
           name: "OfferContract",
           result: await OfferContract.analyzeMethods(),
+          skip: true,
+        },
+        {
+          name: "BidContract",
+          result: await BidContract.analyzeMethods(),
           skip: true,
         },
       ];
@@ -165,6 +175,11 @@ describe("Token Worker", () => {
       offerVerificationKey = (await OfferContract.compile({ cache }))
         .verificationKey;
       console.timeEnd("OfferContract compiled");
+
+      console.time("BidContract compiled");
+      bidVerificationKey = (await BidContract.compile({ cache }))
+        .verificationKey;
+      console.timeEnd("BidContract compiled");
 
       console.timeEnd("compiled");
       console.log(
@@ -222,6 +237,7 @@ describe("Token Worker", () => {
       }
       const adminContract = new FungibleTokenAdmin(adminPublicKey);
       const offerContract = new OfferContract(offerPublicKey, tokenId);
+      const bidContract = new BidContract(bidPublicKey);
       await fetchMinaAccount({ publicKey: sender, force: true });
 
       const tx = await Mina.transaction(
@@ -261,6 +277,19 @@ describe("Token Worker", () => {
       offerDeploy.sign([deployer, offerPrivateKey]);
 
       await sendTx(offerDeploy, "offer deploy");
+
+      const bidDeploy = await Mina.transaction(
+        { sender, fee: await fee(), memo: "bid deploy" },
+        async () => {
+          AccountUpdate.fundNewAccount(sender, 1);
+          await bidContract.deploy({});
+          await zkApp.approveAccountUpdate(bidContract.self);
+        }
+      );
+      await bidDeploy.prove();
+      bidDeploy.sign([deployer, bidPrivateKey]);
+
+      await sendTx(bidDeploy, "bid deploy");
       Memory.info("deployed");
 
       const mintTx = await Mina.transaction(
@@ -282,6 +311,25 @@ describe("Token Worker", () => {
         userTokenBalance.toBigInt() / 1_000_000_000n
       );
 
+      const mintTx2 = await Mina.transaction(
+        {
+          sender,
+          fee: await fee(),
+        },
+        async () => {
+          AccountUpdate.fundNewAccount(sender, 1);
+          await zkApp.mint(buyerPublicKey, new UInt64(1e9));
+        }
+      );
+      await mintTx2.prove();
+      mintTx2.sign([deployer, adminPrivateKey]);
+      await sendTx(mintTx2, "mint2");
+      const buyerTokenBalance0 = Mina.getBalance(buyerPublicKey, tokenId);
+      console.log(
+        "Buyer token balance after mint:",
+        buyerTokenBalance0.toBigInt() / 1_000_000_000n
+      );
+
       console.log("Preparing offer tx");
 
       const offerTx = await Mina.transaction(
@@ -300,7 +348,10 @@ describe("Token Worker", () => {
       );
       await offerTx.prove();
       offerTx.sign([userPrivateKey]);
-      //console.log("Offer tx:", offerTx.toPretty());
+      console.log(
+        "Offer tx au:",
+        JSON.parse(offerTx.toJSON()).accountUpdates.length
+      );
       await sendTx(offerTx, "offer");
       const userTokenBalance1 = Mina.getBalance(userPublicKey, tokenId);
       console.log(
@@ -317,7 +368,7 @@ describe("Token Worker", () => {
       console.log("User balance after deposit:", userBalance1);
       const buyerBalance1 = await accountBalanceMina(buyerPublicKey);
       console.log("Buyer balance before buy:", buyerBalance1);
-
+      /*
       console.log("Preparing transfer tx");
 
       const transferTx = await Mina.transaction(
@@ -338,7 +389,77 @@ describe("Token Worker", () => {
       transferTx.sign([buyerPrivateKey, offerPrivateKey]);
       //console.log("Transfer tx:", transferTx.toPretty());
       await sendTx(transferTx, "transfer"); // should fail
+      */
 
+      console.log("Preparing bid tx");
+
+      const bidTx = await Mina.transaction(
+        {
+          sender: buyerPublicKey,
+          fee: await fee(),
+        },
+        async () => {
+          await bidContract.bid(
+            contractPublicKey,
+            UInt64.from(10e9),
+            UInt64.from(30e9)
+          );
+          await zkApp.approveAccountUpdate(offerContract.self);
+        }
+      );
+      await bidTx.prove();
+      bidTx.sign([buyerPrivateKey]);
+      //console.log("Buy tx:", buyTx.toPretty());
+      await sendTx(bidTx, "bid");
+
+      console.log("Preparing settle tx");
+
+      const settleTx = await Mina.transaction(
+        {
+          sender: buyerPublicKey,
+          fee: await fee(),
+        },
+
+        async () => {
+          //AccountUpdate.fundNewAccount(buyerPublicKey, 1);
+          await bidContract.settle(offerPublicKey, tokenId);
+          await zkApp.approveAccountUpdate(offerContract.self);
+          await zkApp.approveAccountUpdate(bidContract.self);
+        }
+      );
+      console.log(
+        "Settle tx au:",
+        JSON.parse(settleTx.toJSON()).accountUpdates.length
+      );
+      await settleTx.prove();
+      settleTx.sign([buyerPrivateKey]);
+
+      await sendTx(settleTx, "settle");
+
+      /*
+      console.log("Preparing sell tx");
+
+      const sellTx = await Mina.transaction(
+        {
+          sender: userPublicKey,
+          fee: await fee(),
+        },
+
+        async () => {
+          AccountUpdate.fundNewAccount(userPublicKey, 1);
+          await bidContract.sell(userPublicKey);
+          await zkApp.approveAccountUpdate(offerContract.self);
+        }
+      );
+      await sellTx.prove();
+      sellTx.sign([userPrivateKey]);
+      console.log(
+        "Sell tx au:",
+        JSON.parse(sellTx.toJSON()).accountUpdates.length
+      );
+      await sendTx(sellTx, "sell");
+
+     
       console.log("Preparing buy tx");
 
       const buyTx = await Mina.transaction(
@@ -356,6 +477,7 @@ describe("Token Worker", () => {
       buyTx.sign([buyerPrivateKey]);
       //console.log("Buy tx:", buyTx.toPretty());
       await sendTx(buyTx, "buy");
+      */
 
       const userBalance2 = await accountBalanceMina(userPublicKey);
       console.log("User balance after buy:", userBalance2);

@@ -81,10 +81,17 @@ describe("Token Worker", () => {
 
     if (chain === "local" || chain === "lightnet") {
       console.log("local chain:", chain);
+      /*
       const { keys } = await initBlockchain(chain, 2);
       expect(keys.length).toBeGreaterThanOrEqual(2);
       if (keys.length < 2) throw new Error("Invalid keys");
       deployer = keys[0].key;
+      */
+      const local = await Mina.LocalBlockchain({
+        proofsEnabled: false,
+      });
+      Mina.setActiveInstance(local);
+      deployer = local.testAccounts[0].key;
     } else {
       console.log("non-local chain:", chain);
       await initBlockchain(chain);
@@ -422,9 +429,12 @@ describe("Token Worker", () => {
 
         async () => {
           //AccountUpdate.fundNewAccount(buyerPublicKey, 1);
-          await bidContract.settle(offerPublicKey, tokenId);
-          await zkApp.approveAccountUpdate(offerContract.self);
-          await zkApp.approveAccountUpdate(bidContract.self);
+          const au = await bidContract.settle(offerPublicKey, tokenId);
+          //const au = await offerContract.settle(buyerPublicKey);
+          //console.log("Settle tx au:", (au.data as any).option.value);
+          //console.log("Settle tx self:", offerContract.self);
+          //await zkApp.approveBase(au);
+          zkApp.approveAccountUpdate(au);
         }
       );
       console.log(

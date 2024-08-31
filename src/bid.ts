@@ -10,6 +10,7 @@ import {
   SmartContract,
   Bool,
   Field,
+  AccountUpdateForest,
 } from "o1js";
 import { FungibleToken } from "./FungibleToken";
 import { OfferContract } from "./offer";
@@ -72,7 +73,10 @@ export class BidContract extends SmartContract {
     this.token.set(PublicKey.empty());
   }
 
-  @method async settle(offerContractAddress: PublicKey, tokenId: Field) {
+  @method.returns(AccountUpdate) async settle(
+    offerContractAddress: PublicKey,
+    tokenId: Field
+  ) {
     const amount = this.amount.getAndRequireEquals();
     const owner = this.owner.getAndRequireEquals();
     const price = this.price.getAndRequireEquals();
@@ -81,14 +85,17 @@ export class BidContract extends SmartContract {
     //const tokenContract = new FungibleToken(token);
     //const tokenId = tokenContract.deriveTokenId();
     const offerContract = new OfferContract(offerContractAddress, tokenId);
-    const seller = await offerContract.settle(owner, this.address);
-    let receiverAU = this.send({ to: seller, amount: price });
-    receiverAU.body.useFullCommitment = Bool(true);
-    //this.self.approve(bidUpdate);
+    const au = await offerContract.settle(owner);
+    //this.approve(au);
+    //const payerUpdate = await offerContract.settle(owner, this.address);
+    //let receiverAU = this.send({ to: seller, amount: price });
+    //receiverAU.body.useFullCommitment = Bool(true);
+    //this.approve(payerUpdate);
 
     //this.price.set(UInt64.from(0));
     //this.amount.set(UInt64.from(0));
     //this.owner.set(PublicKey.empty());
     //this.token.set(PublicKey.empty());
+    return offerContract.self;
   }
 }

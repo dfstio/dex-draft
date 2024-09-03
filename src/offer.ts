@@ -9,10 +9,10 @@ import {
   UInt64,
   SmartContract,
   Bool,
-  AccountUpdateForest,
-  AccountUpdateTree,
+  Int64,
 } from "o1js";
 import { FungibleToken } from "./FungibleToken";
+import { BidContract } from "./bid";
 
 export class OfferContract extends SmartContract {
   @state(UInt64) price = State<UInt64>(UInt64.from(0));
@@ -66,48 +66,16 @@ export class OfferContract extends SmartContract {
     return buyerUpdate;
   }
 
-  @method.returns(AccountUpdateForest) async settle(
-    buyer: PublicKey
-    //payer: PublicKey
-  ) {
+  @method async settle(bid: PublicKey, buyer: PublicKey) {
     const amount = this.amount.getAndRequireEquals();
     const owner = this.owner.getAndRequireEquals();
     const price = this.price.getAndRequireEquals();
+    const bidContract = new BidContract(bid);
 
-    /*
-    const payerUpdate = AccountUpdate.default(payer);
-    payerUpdate.label = `payment from payer for token sale`;
-    //this.approve(payerUpdate);
-    payerUpdate.body.balanceChange = payerUpdate.body.balanceChange.sub(price);
-    payerUpdate.body.useFullCommitment = Bool(true);
+    let receiver = this.send({ to: buyer, amount });
+    receiver.body.mayUseToken = AccountUpdate.MayUseToken.InheritFromParent;
+    receiver.body.useFullCommitment = Bool(true);
 
-    const ownerUpdate = AccountUpdate.default(owner);
-    ownerUpdate.label = `payment to owner for token sale`;
-    this.approve(ownerUpdate);
-    ownerUpdate.body.balanceChange = ownerUpdate.body.balanceChange.add(price);
-    ownerUpdate.body.useFullCommitment = Bool(true);
-    */
-    // payerUpdate.send({ to: owner, amount: price });
-
-    let receiverAU = this.send({ to: buyer, amount });
-    //const receiver = AccountUpdate.default(buyer, this.tokenId);
-    //receiver.label = `${this.label ?? 'Unlabeled'}.send()`;
-    //this.approve(receiver);
-
-    // Sub the amount from the sender's account
-    //this.balance.subInPlace(amount);
-    //this.self.body.mayUseToken = AccountUpdate.MayUseToken.InheritFromParent;
-    // Add the amount to the receiver's account
-    //receiver.body.balanceChange = receiver.body.balanceChange.add(amount);
-    receiverAU.body.mayUseToken = AccountUpdate.MayUseToken.InheritFromParent;
-    //receiver.body.useFullCommitment = Bool(true);
-
-    //this.price.set(UInt64.from(0));
-    //this.amount.set(UInt64.from(0));
-    //this.owner.set(PublicKey.empty());
-    const forest: AccountUpdateForest = AccountUpdateForest.empty();
-    forest.push(receiverAU);
-    forest.push(this.self);
-    return forest;
+    await bidContract.settle(owner, receiver, price);
   }
 }

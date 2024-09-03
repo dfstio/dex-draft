@@ -237,6 +237,15 @@ export class FungibleToken extends TokenContractV2 {
    */
   @method
   async approveBase(updates: AccountUpdateForest): Promise<void> {
+    /*
+    Provable.asProver(() =>
+      Provable.log(
+        "Approving base",
+
+        updates.toFlatArray().map((u) => u.toPretty())
+      )
+    );
+    */
     this.paused
       .getAndRequireEquals()
       .assertFalse(FungibleTokenErrors.tokenPaused);
@@ -257,6 +266,7 @@ export class FungibleToken extends TokenContractV2 {
         .equals(this.address)
         .and(usesToken)
         .assertFalse(FungibleTokenErrors.noTransferFromCirculation);
+      //Provable.log("Approving update", update, usesToken);
       totalBalance = Provable.if(
         usesToken,
         totalBalance.add(update.balanceChange),

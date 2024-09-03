@@ -429,18 +429,19 @@ describe("Token Worker", () => {
 
         async () => {
           //AccountUpdate.fundNewAccount(buyerPublicKey, 1);
-          const au = await bidContract.settle(offerPublicKey, tokenId);
-          //const au = await offerContract.settle(buyerPublicKey);
+
+          await offerContract.settle(bidPublicKey, buyerPublicKey);
           //console.log("Settle tx au:", (au.data as any).option.value);
           //console.log("Settle tx self:", offerContract.self);
           //await zkApp.approveBase(au);
-          zkApp.approveAccountUpdate(au);
+          await zkApp.approveAccountUpdate(offerContract.self);
         }
       );
       console.log(
         "Settle tx au:",
         JSON.parse(settleTx.toJSON()).accountUpdates.length
       );
+      console.log("Settle tx:", settleTx.toPretty());
       await settleTx.prove();
       settleTx.sign([buyerPrivateKey]);
 

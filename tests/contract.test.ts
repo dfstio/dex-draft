@@ -88,7 +88,7 @@ describe("Token Worker", () => {
       deployer = keys[0].key;
       */
       const local = await Mina.LocalBlockchain({
-        proofsEnabled: false,
+        proofsEnabled: true,
       });
       Mina.setActiveInstance(local);
       deployer = local.testAccounts[0].key;
@@ -318,6 +318,7 @@ describe("Token Worker", () => {
         userTokenBalance.toBigInt() / 1_000_000_000n
       );
 
+      /*
       const mintTx2 = await Mina.transaction(
         {
           sender,
@@ -336,7 +337,7 @@ describe("Token Worker", () => {
         "Buyer token balance after mint:",
         buyerTokenBalance0.toBigInt() / 1_000_000_000n
       );
-
+      */
       console.log("Preparing offer tx");
 
       const offerTx = await Mina.transaction(
@@ -428,7 +429,7 @@ describe("Token Worker", () => {
         },
 
         async () => {
-          //AccountUpdate.fundNewAccount(buyerPublicKey, 1);
+          AccountUpdate.fundNewAccount(buyerPublicKey, 1);
 
           await offerContract.settle(bidPublicKey, buyerPublicKey);
           //console.log("Settle tx au:", (au.data as any).option.value);

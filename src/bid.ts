@@ -77,6 +77,7 @@ export class BidContract extends SmartContract {
     receiver.tokenId.assertEquals(tokenId);
     receiver.publicKey.assertEquals(owner);
     receiver.balanceChange.assertEquals(amount);
+    receiver.body.useFullCommitment.assertEquals(Bool(true));
     this.approve(receiver);
     this.self.body.mayUseToken = AccountUpdate.MayUseToken.InheritFromParent;
 

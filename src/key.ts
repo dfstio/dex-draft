@@ -1,4 +1,6 @@
-import { PublicKey, PrivateKey } from "o1js";
+import { PublicKey, PrivateKey, Mina, AccountUpdate } from "o1js";
+import { accountBalanceMina, fetchMinaAccount, fee } from "zkcloudworker";
+import { sendTx } from "./send";
 
 export type AccountKey = PublicKey & {
   key: PrivateKey;
@@ -63,5 +65,40 @@ export function getAccountKeys(params: {
   } catch (e) {
     console.error("getAccountKeys", e);
     return [];
+  }
+}
+
+export async function topupAccounts(params: {
+  accounts: PublicKey[];
+  sender: AccountKey;
+  amountInMina: number; // MINA
+}) {
+  const { accounts, sender, amountInMina } = params;
+  const amount = amountInMina * 1e9;
+  await fetchMinaAccount({ publicKey: sender, force: true });
+  let nonce = Number(Mina.getAccount(sender).nonce.toBigint());
+  for (let i = 0; i < accounts.length; i++) {
+    const to = accounts[i];
+    await fetchMinaAccount({ publicKey: to, force: false });
+    if (!Mina.hasAccount(to)) {
+      const topupTx = await Mina.transaction(
+        {
+          sender,
+          fee: await fee(),
+          nonce: nonce++,
+        },
+        async () => {
+          const senderUpdate = AccountUpdate.createSigned(sender);
+          senderUpdate.balance.subInPlace(1000000000);
+          senderUpdate.send({ to, amount });
+        }
+      );
+      topupTx.sign([sender.key]);
+      await sendTx(
+        topupTx,
+        `topup ${to.toBase58()}`,
+        i === accounts.length - 1
+      );
+    }
   }
 }

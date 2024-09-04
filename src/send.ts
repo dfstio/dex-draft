@@ -7,9 +7,10 @@ export function useChain(chain: blockchain) {
   usedChain = chain;
 }
 
-async function sendTx(
+export async function sendTx(
   tx: Mina.Transaction<false, true> | Mina.Transaction<true, true>,
   description: string = "",
+  wait: boolean = true,
   chain: blockchain | undefined = undefined
 ) {
   chain = chain ?? usedChain ?? "local";
@@ -47,7 +48,7 @@ async function sendTx(
       );
     }
 
-    if (txSent.status === "pending") {
+    if (txSent.status === "pending" && wait) {
       console.log(`Waiting for tx inclusion...`);
       const txIncluded = await txSent.safeWait();
       console.log(

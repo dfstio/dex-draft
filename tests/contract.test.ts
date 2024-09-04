@@ -32,7 +32,7 @@ import { BidContract } from "../src/bid";
 import { USER_PRIVATE_KEY, USER_PUBLIC_KEY, TOKEN_ADDRESS } from "../env.json";
 import packageJson from "../package.json";
 import { JWT } from "../env.json";
-import { off } from "process";
+import { sendTx, useChain } from "../src/send";
 
 setNumberOfWorkers(8);
 
@@ -574,6 +574,7 @@ function processArguments(): {
     chainName !== "zeko"
   )
     throw new Error("Invalid chain name");
+  useChain(chainName as blockchain);
   return {
     chain: chainName as blockchain,
     compile:

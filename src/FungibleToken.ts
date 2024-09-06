@@ -237,21 +237,26 @@ export class FungibleToken extends TokenContractV2 {
    */
   @method
   async approveBase(updates: AccountUpdateForest): Promise<void> {
-    /*
     Provable.asProver(() =>
       Provable.log(
         "Approving base",
-
         updates.toFlatArray().map((u) => u.toPretty())
       )
     );
-    */
+
     this.paused
       .getAndRequireEquals()
       .assertFalse(FungibleTokenErrors.tokenPaused);
     let totalBalance = Int64.from(0);
     this.forEachUpdate(updates, (update, usesToken) => {
       // Make sure that the account permissions are not changed
+      Provable.asProver(() =>
+        Provable.log(
+          "Approving update",
+          usesToken.toBoolean(),
+          update.toPretty()
+        )
+      );
       this.checkPermissionsUpdate(update);
       this.emitEventIf(
         usesToken,
@@ -274,6 +279,7 @@ export class FungibleToken extends TokenContractV2 {
       );
       totalBalance.isPositiveV2().assertFalse(FungibleTokenErrors.flashMinting);
     });
+
     totalBalance.assertEquals(
       Int64.zero,
       FungibleTokenErrors.unbalancedTransaction

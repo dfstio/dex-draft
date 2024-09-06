@@ -1,25 +1,31 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  PrivateKey,
   Mina,
   AccountUpdate,
   VerificationKey,
   UInt64,
   Cache,
+  PublicKey,
   setNumberOfWorkers,
+  UInt8,
+  Bool,
 } from "o1js";
 
 import {
+  zkCloudWorkerClient,
   blockchain,
   Memory,
   fetchMinaAccount,
   fee,
   initBlockchain,
+  accountBalanceMina,
+  sleep,
 } from "zkcloudworker";
 import { zkcloudworker } from "..";
 import { FungibleToken } from "../src/FungibleToken";
 import { FungibleTokenAdmin } from "../src/FungibleTokenAdmin";
-import { OfferContract } from "../src/offer";
-import { BidContract } from "../src/bid";
+import { SwapContract } from "../src/swap";
 import { JWT, USERS_PRIVATE_KEYS, CONTRACTS_PRIVATE_KEYS } from "../env.json";
 import { sendTx, useChain } from "../src/send";
 import { AccountKey, getAccountKeys, topupAccounts } from "../src/key";
@@ -29,39 +35,61 @@ import { mint } from "../src/mint";
 
 setNumberOfWorkers(8);
 
-const { chain, compile, deploy } = processArguments();
+const { chain, compile, deploy, send, useLocalCloudWorker } =
+  processArguments();
 
-const [sender, user, buyer, admin] = getAccountKeys({
-  names: ["sender", "user", "buyer", "admin"],
-  privateKeys: USERS_PRIVATE_KEYS,
-});
+const [sender, user, buyer, admin, adminA, adminB, userA, userB] =
+  getAccountKeys({
+    names: [
+      "sender",
+      "user",
+      "buyer",
+      "admin",
+      "adminA",
+      "adminB",
+      "userA",
+      "userB",
+    ],
+    privateKeys: USERS_PRIVATE_KEYS,
+  });
 
 const [
   tokenContractKey,
   adminContractKey,
   offerContractKey,
   bidContractKey,
-  swapContractKey,
+  tokenAKey,
+  tokenBKey,
+  adminAKey,
+  adminBKey,
+  swapAKey,
+  swapBKey,
 ] = getAccountKeys({
   names: [
     "tokenContract",
     "adminContract",
     "offerContract",
     "bidContract",
-    "swapContract",
+    "tokenA",
+    "tokenB",
+    "adminA",
+    "adminB",
+    "swapA",
+    "swapB",
   ],
   privateKeys: CONTRACTS_PRIVATE_KEYS,
 });
 
-const tokenContract = new FungibleToken(tokenContractKey);
-const tokenId = tokenContract.deriveTokenId();
-const offerContract = new OfferContract(offerContractKey, tokenId);
-const bidContract = new BidContract(bidContractKey);
-
+const tokenA = new FungibleToken(tokenAKey);
+const tokenAId = tokenA.deriveTokenId();
+const tokenB = new FungibleToken(tokenBKey);
+const tokenBId = tokenB.deriveTokenId();
+const adminAContract = new FungibleTokenAdmin(adminAKey);
+const adminBContract = new FungibleTokenAdmin(adminBKey);
+const swapA = new SwapContract(swapAKey, tokenAId);
+const swapB = new SwapContract(swapBKey, tokenBId);
 let contractVerificationKey: VerificationKey;
 let adminVerificationKey: VerificationKey;
-let offerVerificationKey: VerificationKey;
-let bidVerificationKey: VerificationKey;
 let swapVerificationKey: VerificationKey;
 let blockchainInitialized = false;
 
@@ -78,7 +106,7 @@ describe("Token Offer", () => {
       deployer = keys[0].key;
       */
       const local = await Mina.LocalBlockchain({
-        proofsEnabled: true,
+        proofsEnabled: false,
       });
       Mina.setActiveInstance(local);
       const topup: AccountKey = Object.assign(local.testAccounts[0], {
@@ -86,7 +114,7 @@ describe("Token Offer", () => {
         name: "topup",
       });
       await topupAccounts({
-        accounts: [sender, user, buyer, admin],
+        accounts: [sender, userA, userB, adminA, adminB],
         sender: topup,
         amountInMina: 100,
       });
@@ -96,15 +124,20 @@ describe("Token Offer", () => {
     }
     await printAddresses([
       sender,
-      user,
-      buyer,
-      admin,
-      tokenContractKey,
-      adminContractKey,
-      offerContractKey,
-      bidContractKey,
+      userA,
+      userB,
+      adminA,
+      adminB,
+      adminAKey,
+      adminBKey,
+      tokenAKey,
+      tokenBKey,
+      swapAKey,
+      swapBKey,
     ]);
-    await printBalances({ accounts: [sender, user, buyer, admin] });
+    console.log("tokenId A:", tokenAId.toBigInt().toString(16));
+    console.log("tokenId B:", tokenBId.toBigInt().toString(16));
+    await printBalances({ accounts: [sender, userA, userB, adminA, adminB] });
     blockchainInitialized = true;
   });
 
@@ -125,13 +158,8 @@ describe("Token Offer", () => {
           skip: true,
         },
         {
-          name: "OfferContract",
-          result: await OfferContract.analyzeMethods(),
-          skip: true,
-        },
-        {
-          name: "BidContract",
-          result: await BidContract.analyzeMethods(),
+          name: "SwapContract",
+          result: await SwapContract.analyzeMethods(),
           skip: true,
         },
       ];
@@ -169,15 +197,10 @@ describe("Token Offer", () => {
         .verificationKey;
       console.timeEnd("FungibleToken compiled");
 
-      console.time("OfferContract compiled");
-      offerVerificationKey = (await OfferContract.compile({ cache }))
+      console.time("SwapContract compiled");
+      swapVerificationKey = (await SwapContract.compile({ cache }))
         .verificationKey;
-      console.timeEnd("OfferContract compiled");
-
-      console.time("BidContract compiled");
-      bidVerificationKey = (await BidContract.compile({ cache }))
-        .verificationKey;
-      console.timeEnd("BidContract compiled");
+      console.timeEnd("SwapContract compiled");
 
       console.timeEnd("compiled");
       console.log(
@@ -189,8 +212,8 @@ describe("Token Offer", () => {
         adminVerificationKey.hash.toJSON()
       );
       console.log(
-        "OfferContract verification key",
-        offerVerificationKey.hash.toJSON()
+        "SwapContract verification key",
+        swapVerificationKey.hash.toJSON()
       );
       Memory.info("compiled");
     });
@@ -203,167 +226,235 @@ describe("Token Offer", () => {
         tokenUri: "https://zkcloudworker.com",
         adminUri: "https://zkcloudworker.com",
         sender,
-        adminKey: admin,
-        adminContractKey,
-        tokenContractKey,
+        adminKey: adminA,
+        adminContractKey: adminAKey,
+        tokenContractKey: tokenAKey,
+      });
+
+      await deployToken({
+        tokenSymbol: "TEST_B",
+        tokenUri: "https://zkcloudworker.com",
+        adminUri: "https://zkcloudworker.com",
+        sender,
+        adminKey: adminB,
+        adminContractKey: adminBKey,
+        tokenContractKey: tokenBKey,
       });
 
       await mint({
-        account: user,
+        account: userA,
         sender,
-        adminKey: admin,
-        adminContractKey,
-        tokenContractKey,
+        adminKey: adminA,
+        adminContractKey: adminAKey,
+        tokenContractKey: tokenAKey,
         amount: 1000,
       });
 
-      await fetchMinaAccount({ publicKey: sender, force: true });
-      await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
-      await fetchMinaAccount({
-        publicKey: tokenContractKey,
-        tokenId,
-        force: true,
+      await mint({
+        account: userB,
+        sender,
+        adminKey: adminB,
+        adminContractKey: adminBKey,
+        tokenContractKey: tokenBKey,
+        amount: 1000,
       });
-      const offerDeploy = await Mina.transaction(
-        { sender, fee: await fee(), memo: "offer deploy" },
-        async () => {
-          AccountUpdate.fundNewAccount(sender, 1);
-          await offerContract.deploy({});
-          await tokenContract.approveAccountUpdate(offerContract.self);
-        }
-      );
-      await offerDeploy.prove();
-      offerDeploy.sign([sender.key, offerContractKey.key]);
-      await sendTx(offerDeploy, "offer deploy");
+
+      await mint({
+        account: userB,
+        sender,
+        adminKey: adminA,
+        adminContractKey: adminAKey,
+        tokenContractKey: tokenAKey,
+        amount: 1,
+      });
+
+      await mint({
+        account: userA,
+        sender,
+        adminKey: adminB,
+        adminContractKey: adminBKey,
+        tokenContractKey: tokenBKey,
+        amount: 1,
+      });
 
       await fetchMinaAccount({ publicKey: sender, force: true });
-      await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
+      await fetchMinaAccount({ publicKey: tokenAKey, force: true });
       await fetchMinaAccount({
-        publicKey: tokenContractKey,
-        tokenId,
+        publicKey: tokenAKey,
+        tokenId: tokenAId,
         force: true,
       });
-      const bidDeploy = await Mina.transaction(
-        { sender, fee: await fee(), memo: "bid deploy" },
+      const swapADeploy = await Mina.transaction(
+        { sender, fee: await fee(), memo: "swap A deploy" },
         async () => {
           AccountUpdate.fundNewAccount(sender, 1);
-          await bidContract.deploy({});
-          await tokenContract.approveAccountUpdate(bidContract.self);
+          await swapA.deploy({});
+          await tokenA.approveAccountUpdate(swapA.self);
         }
       );
-      await bidDeploy.prove();
-      bidDeploy.sign([sender.key, bidContractKey.key]);
-      await sendTx(bidDeploy, "bid deploy");
+      await swapADeploy.prove();
+      swapADeploy.sign([sender.key, swapAKey.key]);
+      await sendTx(swapADeploy, "swap A deploy");
+
+      await fetchMinaAccount({ publicKey: sender, force: true });
+      await fetchMinaAccount({ publicKey: tokenBKey, force: true });
+      await fetchMinaAccount({
+        publicKey: tokenBKey,
+        tokenId: tokenBId,
+        force: true,
+      });
+      const swapBDeploy = await Mina.transaction(
+        { sender, fee: await fee(), memo: "swap B deploy" },
+        async () => {
+          AccountUpdate.fundNewAccount(sender, 1);
+          await swapB.deploy({});
+          await tokenB.approveAccountUpdate(swapB.self);
+        }
+      );
+      await swapBDeploy.prove();
+      swapBDeploy.sign([sender.key, swapBKey.key]);
+      await sendTx(swapBDeploy, "swap B deploy");
+
       Memory.info("deployed");
       await printBalances({
-        accounts: [user, buyer, offerContractKey],
-        tokenId,
+        accounts: [userA, userB, swapAKey, swapBKey],
+        tokenId: tokenAId,
         tokenName: "TEST_A",
       });
       await printBalances({
-        accounts: [user, buyer, bidContractKey],
+        accounts: [userA, userB, swapAKey, swapBKey],
+        tokenId: tokenBId,
+        tokenName: "TEST_B",
       });
 
-      console.log("Preparing offer tx");
-      await fetchMinaAccount({ publicKey: user, force: true });
-      await fetchMinaAccount({ publicKey: user, tokenId, force: true });
-      await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
+      console.log("Preparing offer A tx");
+      await fetchMinaAccount({ publicKey: userA, force: true });
       await fetchMinaAccount({
-        publicKey: tokenContractKey,
-        tokenId,
+        publicKey: userA,
+        tokenId: tokenAId,
+        force: true,
+      });
+      await fetchMinaAccount({ publicKey: tokenAKey, force: true });
+      await fetchMinaAccount({
+        publicKey: tokenAKey,
+        tokenId: tokenAId,
         force: true,
       });
       await fetchMinaAccount({
-        publicKey: offerContractKey,
-        tokenId,
+        publicKey: swapAKey,
+        tokenId: tokenAId,
         force: true,
       });
 
-      const offerTx = await Mina.transaction(
+      const offerATx = await Mina.transaction(
         {
-          sender: user,
+          sender: userA,
           fee: await fee(),
-          memo: "offer",
+          memo: "offer A",
         },
         async () => {
-          await offerContract.offer(
-            tokenContractKey,
-            UInt64.from(10e9),
-            UInt64.from(30e9)
-          );
-          await tokenContract.approveAccountUpdate(offerContract.self);
+          await swapA.offer(tokenAKey, tokenBKey, UInt64.from(10e9));
+          await tokenA.approveAccountUpdate(swapA.self);
         }
       );
-      await offerTx.prove();
-      offerTx.sign([user.key]);
+      await offerATx.prove();
+      offerATx.sign([userA.key]);
       console.log(
-        "Offer tx au:",
-        JSON.parse(offerTx.toJSON()).accountUpdates.length
+        "Offer A tx au:",
+        JSON.parse(offerATx.toJSON()).accountUpdates.length
       );
-      await sendTx(offerTx, "offer");
+      await sendTx(offerATx, "offer A");
       await printBalances({
-        accounts: [user, buyer, offerContractKey],
-        tokenId,
+        accounts: [userA, userB, swapAKey, swapBKey],
+        tokenId: tokenAId,
         tokenName: "TEST_A",
       });
       await printBalances({
-        accounts: [user, buyer, bidContractKey],
+        accounts: [userA, userB, swapAKey, swapBKey],
+        tokenId: tokenBId,
+        tokenName: "TEST_B",
       });
 
-      console.log("Preparing bid tx");
-      await fetchMinaAccount({ publicKey: buyer, force: true });
-      await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
+      console.log("Preparing offer B tx");
+      await fetchMinaAccount({ publicKey: userB, force: true });
       await fetchMinaAccount({
-        publicKey: tokenContractKey,
-        tokenId,
+        publicKey: userB,
+        tokenId: tokenBId,
         force: true,
       });
-      await fetchMinaAccount({ publicKey: bidContractKey, force: true });
+      await fetchMinaAccount({ publicKey: tokenBKey, force: true });
+      await fetchMinaAccount({
+        publicKey: tokenBKey,
+        tokenId: tokenBId,
+        force: true,
+      });
+      await fetchMinaAccount({
+        publicKey: swapBKey,
+        tokenId: tokenBId,
+        force: true,
+      });
 
-      const bidTx = await Mina.transaction(
+      const offerBTx = await Mina.transaction(
         {
-          sender: buyer,
+          sender: userB,
           fee: await fee(),
-          memo: "bid",
+          memo: "offer B",
         },
         async () => {
-          await bidContract.bid(
-            tokenContractKey,
-            UInt64.from(10e9),
-            UInt64.from(30e9)
-          );
-          await tokenContract.approveAccountUpdate(offerContract.self);
+          await swapB.offer(tokenBKey, tokenAKey, UInt64.from(10e9));
+          await tokenB.approveAccountUpdate(swapB.self);
         }
       );
-      await bidTx.prove();
-      bidTx.sign([buyer.key]);
-      await sendTx(bidTx, "bid");
+      await offerBTx.prove();
+      offerBTx.sign([userB.key]);
+      console.log(
+        "Offer B tx au:",
+        JSON.parse(offerBTx.toJSON()).accountUpdates.length
+      );
+      await sendTx(offerBTx, "offer B");
       await printBalances({
-        accounts: [user, buyer, offerContractKey],
-        tokenId,
+        accounts: [userA, userB, swapAKey, swapBKey],
+        tokenId: tokenAId,
         tokenName: "TEST_A",
       });
       await printBalances({
-        accounts: [user, buyer, bidContractKey],
+        accounts: [userA, userB, swapAKey, swapBKey],
+        tokenId: tokenBId,
+        tokenName: "TEST_B",
       });
 
       console.log("Preparing settle tx");
       await fetchMinaAccount({ publicKey: sender, force: true });
-      await fetchMinaAccount({ publicKey: user, force: true });
-      await fetchMinaAccount({ publicKey: buyer, tokenId, force: false });
-      await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
       await fetchMinaAccount({
-        publicKey: tokenContractKey,
-        tokenId,
+        publicKey: userA,
+        tokenId: tokenBId,
+        force: false,
+      });
+      await fetchMinaAccount({
+        publicKey: userB,
+        tokenId: tokenAId,
+        force: false,
+      });
+      await fetchMinaAccount({ publicKey: tokenAKey, force: true });
+      await fetchMinaAccount({
+        publicKey: tokenAKey,
+        tokenId: tokenAId,
+        force: true,
+      });
+      await fetchMinaAccount({ publicKey: tokenBKey, force: true });
+      await fetchMinaAccount({
+        publicKey: tokenBKey,
+        tokenId: tokenBId,
         force: true,
       });
       await fetchMinaAccount({
-        publicKey: offerContractKey,
-        tokenId,
+        publicKey: swapAKey,
+        tokenId: tokenAId,
         force: true,
       });
       await fetchMinaAccount({
-        publicKey: bidContractKey,
+        publicKey: swapBKey,
+        tokenId: tokenBId,
         force: true,
       });
 
@@ -371,32 +462,34 @@ describe("Token Offer", () => {
         {
           sender,
           fee: await fee(),
-          memo: "settle",
+          memo: "swap settle",
         },
 
         async () => {
-          AccountUpdate.fundNewAccount(sender, 1);
+          //AccountUpdate.fundNewAccount(sender, 1);
+          await swapA.settle(tokenAKey, tokenBKey, swapBKey, tokenBId, userB);
 
-          await offerContract.settle(bidContractKey, buyer);
-          await tokenContract.approveAccountUpdate(offerContract.self);
+          await tokenA.approveAccountUpdate(swapA.self);
         }
       );
+      await settleTx.prove();
+      settleTx.sign([sender.key]);
       console.log(
         "Settle tx au:",
         JSON.parse(settleTx.toJSON()).accountUpdates.length
       );
       console.log("Settle tx:", settleTx.toPretty());
-      await settleTx.prove();
-      settleTx.sign([sender.key]);
 
       await sendTx(settleTx, "settle");
       await printBalances({
-        accounts: [user, buyer, offerContractKey],
-        tokenId,
+        accounts: [userA, userB, swapAKey, swapBKey],
+        tokenId: tokenAId,
         tokenName: "TEST_A",
       });
       await printBalances({
-        accounts: [user, buyer, bidContractKey],
+        accounts: [userA, userB, swapAKey, swapBKey],
+        tokenId: tokenBId,
+        tokenName: "TEST_B",
       });
     });
   }

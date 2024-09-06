@@ -10,9 +10,16 @@ export async function mint(params: {
   adminKey: AccountKey;
   adminContractKey: PublicKey;
   tokenContractKey: PublicKey;
+  amount: number;
 }) {
-  const { account, sender, adminKey, adminContractKey, tokenContractKey } =
-    params;
+  const {
+    account,
+    sender,
+    adminKey,
+    adminContractKey,
+    tokenContractKey,
+    amount,
+  } = params;
   const tokenContract = new FungibleToken(tokenContractKey);
   const tokenId = tokenContract.deriveTokenId();
   await fetchMinaAccount({ publicKey: sender, force: true });
@@ -31,10 +38,11 @@ export async function mint(params: {
     {
       sender,
       fee: await fee(),
+      memo: "mint",
     },
     async () => {
       if (!isExistingAccount) AccountUpdate.fundNewAccount(sender, 1);
-      await tokenContract.mint(account, new UInt64(1000e9));
+      await tokenContract.mint(account, new UInt64(amount * 1e9));
     }
   );
   await mintTx.prove();

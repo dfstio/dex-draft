@@ -9,7 +9,6 @@ import {
   UInt64,
   SmartContract,
   Bool,
-  Int64,
 } from "o1js";
 import { FungibleToken } from "./FungibleToken";
 import { BidContract } from "./bid";

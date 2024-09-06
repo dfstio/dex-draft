@@ -6,6 +6,8 @@
     "test": "jest",
     "local": "jest --chain=local --cloud=local --deploy=true",
     "offer": "jest offer.test --chain=local --cloud=local --deploy=true --send=false",
+    "offer.devnet": "jest offer.test --chain=devnet --cloud=local --deploy=true --send=false",
+    "swap": "jest swap.test --chain=local --cloud=local --deploy=true --send=false",
     "lightnet.deploy": "jest --chain=lightnet --cloud=local --deploy=true --send=false",
     "lightnet.run": "jest --chain=lightnet --cloud=local --deploy=false",
     "zeko.deploy": "jest --chain=zeko --deploy=true --cloud=local --send=false",

@@ -240,7 +240,7 @@ export class FungibleToken extends TokenContractV2 {
     Provable.asProver(() =>
       Provable.log(
         "Approving base",
-        updates.toFlatArray().map((u) => u.toPretty())
+        updates.toFlatArray(false).map((u) => u.toPretty())
       )
     );
 
@@ -250,6 +250,7 @@ export class FungibleToken extends TokenContractV2 {
     let totalBalance = Int64.from(0);
     this.forEachUpdate(updates, (update, usesToken) => {
       // Make sure that the account permissions are not changed
+      /*
       Provable.asProver(() =>
         Provable.log(
           "Approving update",
@@ -257,6 +258,7 @@ export class FungibleToken extends TokenContractV2 {
           update.toPretty()
         )
       );
+      */
       this.checkPermissionsUpdate(update);
       this.emitEventIf(
         usesToken,

@@ -140,8 +140,8 @@ describe("Token Offer", () => {
       swapBKey,
       swapSettleKey,
     ]);
-    console.log("tokenId A:", tokenAId.toBigInt().toString(16));
-    console.log("tokenId B:", tokenBId.toBigInt().toString(16));
+    console.log("tokenId A:", tokenAId.toJSON());
+    console.log("tokenId B:", tokenBId.toJSON());
     await printBalances({ accounts: [sender, userA, userB, adminA, adminB] });
     blockchainInitialized = true;
   });
@@ -494,24 +494,18 @@ describe("Token Offer", () => {
 
       const settleTx = await Mina.transaction(
         {
-          sender,
+          sender: userA,
           fee: await fee(),
           memo: "swap settle",
         },
 
         async () => {
-          await swapA.settle(
-            tokenBKey,
-            userB,
-            swapBKey,
-            tokenBId,
-            swapSettleKey
-          );
+          await swapA.settle(tokenBKey, swapBKey, tokenBId, userB);
           await tokenA.approveAccountUpdate(swapA.self);
         }
       );
       await settleTx.prove();
-      settleTx.sign([sender.key]);
+      settleTx.sign([userA.key]);
       console.log(
         "Settle tx au:",
         JSON.parse(settleTx.toJSON()).accountUpdates.length

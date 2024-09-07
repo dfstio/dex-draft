@@ -25,7 +25,7 @@ import {
 import { zkcloudworker } from "..";
 import { FungibleToken } from "../src/FungibleToken";
 import { FungibleTokenAdmin } from "../src/FungibleTokenAdmin";
-import { SwapContract } from "../src/swap";
+import { SwapContract, SwapSettle } from "../src/swap";
 import { JWT, USERS_PRIVATE_KEYS, CONTRACTS_PRIVATE_KEYS } from "../env.json";
 import { sendTx, useChain } from "../src/send";
 import { AccountKey, getAccountKeys, topupAccounts } from "../src/key";
@@ -64,6 +64,7 @@ const [
   adminBKey,
   swapAKey,
   swapBKey,
+  swapSettleKey,
 ] = getAccountKeys({
   names: [
     "tokenContract",
@@ -76,6 +77,7 @@ const [
     "adminB",
     "swapA",
     "swapB",
+    "swapSettle",
   ],
   privateKeys: CONTRACTS_PRIVATE_KEYS,
 });
@@ -88,9 +90,11 @@ const adminAContract = new FungibleTokenAdmin(adminAKey);
 const adminBContract = new FungibleTokenAdmin(adminBKey);
 const swapA = new SwapContract(swapAKey, tokenAId);
 const swapB = new SwapContract(swapBKey, tokenBId);
+const swapSettle = new SwapSettle(swapSettleKey);
 let contractVerificationKey: VerificationKey;
 let adminVerificationKey: VerificationKey;
 let swapVerificationKey: VerificationKey;
+let swapSettleVerificationKey: VerificationKey;
 let blockchainInitialized = false;
 
 describe("Token Offer", () => {
@@ -134,6 +138,7 @@ describe("Token Offer", () => {
       tokenBKey,
       swapAKey,
       swapBKey,
+      swapSettleKey,
     ]);
     console.log("tokenId A:", tokenAId.toBigInt().toString(16));
     console.log("tokenId B:", tokenBId.toBigInt().toString(16));
@@ -155,6 +160,11 @@ describe("Token Offer", () => {
         {
           name: "FungibleTokenAdmin",
           result: await FungibleTokenAdmin.analyzeMethods(),
+          skip: true,
+        },
+        {
+          name: "SwapSettle",
+          result: await SwapSettle.analyzeMethods(),
           skip: true,
         },
         {
@@ -197,6 +207,11 @@ describe("Token Offer", () => {
         .verificationKey;
       console.timeEnd("FungibleToken compiled");
 
+      console.time("SwapSettle compiled");
+      swapSettleVerificationKey = (await SwapSettle.compile({ cache }))
+        .verificationKey;
+      console.timeEnd("SwapSettle compiled");
+
       console.time("SwapContract compiled");
       swapVerificationKey = (await SwapContract.compile({ cache }))
         .verificationKey;
@@ -210,6 +225,10 @@ describe("Token Offer", () => {
       console.log(
         "FungibleTokenAdmin verification key",
         adminVerificationKey.hash.toJSON()
+      );
+      console.log(
+        "SwapSettle verification key",
+        swapSettleVerificationKey.hash.toJSON()
       );
       console.log(
         "SwapContract verification key",
@@ -314,6 +333,17 @@ describe("Token Offer", () => {
       await swapBDeploy.prove();
       swapBDeploy.sign([sender.key, swapBKey.key]);
       await sendTx(swapBDeploy, "swap B deploy");
+
+      await fetchMinaAccount({ publicKey: sender, force: true });
+      const swapSettleDeploy = await Mina.transaction(
+        { sender, fee: await fee(), memo: "swapSettle deploy" },
+        async () => {
+          AccountUpdate.fundNewAccount(sender, 1);
+          await swapSettle.deploy({});
+        }
+      );
+      swapSettleDeploy.sign([sender.key, swapSettleKey.key]);
+      await sendTx(swapSettleDeploy, "swapSettle deploy");
 
       Memory.info("deployed");
       await printBalances({
@@ -457,6 +487,10 @@ describe("Token Offer", () => {
         tokenId: tokenBId,
         force: true,
       });
+      await fetchMinaAccount({
+        publicKey: swapSettleKey,
+        force: true,
+      });
 
       const settleTx = await Mina.transaction(
         {
@@ -466,9 +500,13 @@ describe("Token Offer", () => {
         },
 
         async () => {
-          //AccountUpdate.fundNewAccount(sender, 1);
-          await swapA.settle(tokenAKey, tokenBKey, swapBKey, tokenBId, userB);
-
+          await swapA.settle(
+            tokenBKey,
+            userB,
+            swapBKey,
+            tokenBId,
+            swapSettleKey
+          );
           await tokenA.approveAccountUpdate(swapA.self);
         }
       );

@@ -24,6 +24,11 @@ import {
   FungibleTokenAdminBase,
 } from "./FungibleTokenAdmin";
 
+let debugAU = false;
+export function setDebug(val: boolean) {
+  debugAU = val;
+}
+
 interface FungibleTokenDeployProps extends Exclude<DeployArgs, undefined> {
   /** The token symbol. */
   symbol: string;
@@ -237,12 +242,13 @@ export class FungibleToken extends TokenContractV2 {
    */
   @method
   async approveBase(updates: AccountUpdateForest): Promise<void> {
-    Provable.asProver(() =>
-      Provable.log(
-        "Approving base",
-        updates.toFlatArray(false).map((u) => u.toPretty())
-      )
-    );
+    Provable.asProver(() => {
+      if (debugAU)
+        Provable.log(
+          "Approving base",
+          updates.toFlatArray(false).map((u) => u.toPretty())
+        );
+    });
 
     this.paused
       .getAndRequireEquals()
@@ -250,15 +256,16 @@ export class FungibleToken extends TokenContractV2 {
     let totalBalance = Int64.from(0);
     this.forEachUpdate(updates, (update, usesToken) => {
       // Make sure that the account permissions are not changed
-      /*
-      Provable.asProver(() =>
-        Provable.log(
-          "Approving update",
-          usesToken.toBoolean(),
-          update.toPretty()
-        )
-      );
-      */
+
+      Provable.asProver(() => {
+        if (debugAU)
+          Provable.log(
+            "Approving update",
+            usesToken.toBoolean(),
+            update.toPretty()
+          );
+      });
+
       this.checkPermissionsUpdate(update);
       this.emitEventIf(
         usesToken,

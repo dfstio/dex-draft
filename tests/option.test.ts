@@ -18,7 +18,7 @@ import {
 import { zkcloudworker } from "..";
 import { FungibleToken, setDebug } from "../src/FungibleToken";
 import { FungibleTokenAdmin } from "../src/FungibleTokenAdmin";
-import { SwapOffer } from "../src/swap";
+import { OptionOffer } from "../src/option";
 import { sendTx, useChain } from "../src/send";
 import { AccountKey, topupAccounts } from "../src/key";
 import { getAccounts } from "../src/addresses";
@@ -28,7 +28,13 @@ import { mint } from "../src/mint";
 
 setNumberOfWorkers(8);
 
-const { chain, compile, deploy, debugAU } = processArguments();
+const {
+  chain,
+  compile,
+  deploy,
+  debugAU,
+  mint: shouldMint,
+} = processArguments();
 setDebug(debugAU);
 const {
   sender,
@@ -40,9 +46,7 @@ const {
   tokenBKey,
   adminAKey,
   adminBKey,
-  swapAKey,
-  swapBKey,
-  bot,
+  optionOfferKey,
 } = getAccounts();
 
 const tokenA = new FungibleToken(tokenAKey);
@@ -51,11 +55,10 @@ const tokenB = new FungibleToken(tokenBKey);
 const tokenBId = tokenB.deriveTokenId();
 const adminAContract = new FungibleTokenAdmin(adminAKey);
 const adminBContract = new FungibleTokenAdmin(adminBKey);
-const swapA = new SwapOffer(swapAKey, tokenAId);
-const swapB = new SwapOffer(swapBKey, tokenBId);
+const option = new OptionOffer(optionOfferKey, tokenAId);
 let contractVerificationKey: VerificationKey;
 let adminVerificationKey: VerificationKey;
-let swapVerificationKey: VerificationKey;
+let optionVerificationKey: VerificationKey;
 let blockchainInitialized = false;
 
 describe("Token Offer", () => {
@@ -79,7 +82,7 @@ describe("Token Offer", () => {
         name: "topup",
       });
       await topupAccounts({
-        accounts: [sender, userA, userB, adminA, adminB, bot],
+        accounts: [sender, userA, userB, adminA, adminB],
         sender: topup,
         amountInMina: 100,
       });
@@ -97,14 +100,12 @@ describe("Token Offer", () => {
       adminBKey,
       tokenAKey,
       tokenBKey,
-      swapAKey,
-      swapBKey,
-      bot,
+      optionOfferKey,
     ]);
     console.log("tokenId A:", tokenAId.toJSON());
     console.log("tokenId B:", tokenBId.toJSON());
     await printBalances({
-      accounts: [sender, userA, userB, adminA, adminB, bot],
+      accounts: [sender, userA, userB, adminA, adminB],
     });
     blockchainInitialized = true;
   });
@@ -126,8 +127,8 @@ describe("Token Offer", () => {
           skip: true,
         },
         {
-          name: "SwapOffer",
-          result: await SwapOffer.analyzeMethods(),
+          name: "OptionOffer",
+          result: await OptionOffer.analyzeMethods(),
           skip: true,
         },
       ];
@@ -165,10 +166,10 @@ describe("Token Offer", () => {
         .verificationKey;
       console.timeEnd("FungibleToken compiled");
 
-      console.time("SwapOffer compiled");
-      swapVerificationKey = (await SwapOffer.compile({ cache }))
+      console.time("OptionOffer compiled");
+      optionVerificationKey = (await OptionOffer.compile({ cache }))
         .verificationKey;
-      console.timeEnd("SwapOffer compiled");
+      console.timeEnd("OptionOffer compiled");
 
       console.timeEnd("compiled");
       console.log(
@@ -180,8 +181,8 @@ describe("Token Offer", () => {
         adminVerificationKey.hash.toJSON()
       );
       console.log(
-        "SwapOffer verification key",
-        swapVerificationKey.hash.toJSON()
+        "OptionOffer verification key",
+        optionVerificationKey.hash.toJSON()
       );
       Memory.info("compiled");
     });
@@ -189,79 +190,63 @@ describe("Token Offer", () => {
   if (deploy) {
     it(`should deploy contract`, async () => {
       expect(blockchainInitialized).toBe(true);
-      await deployToken({
-        tokenSymbol: "TEST_A",
-        tokenUri: "https://zkcloudworker.com",
-        adminUri: "https://zkcloudworker.com",
-        sender,
-        adminKey: adminA,
-        adminContractKey: adminAKey,
-        tokenContractKey: tokenAKey,
-      });
+      if (shouldMint) {
+        await deployToken({
+          tokenSymbol: "TEST_A",
+          tokenUri: "https://zkcloudworker.com",
+          adminUri: "https://zkcloudworker.com",
+          sender,
+          adminKey: adminA,
+          adminContractKey: adminAKey,
+          tokenContractKey: tokenAKey,
+        });
 
-      await deployToken({
-        tokenSymbol: "TEST_B",
-        tokenUri: "https://zkcloudworker.com",
-        adminUri: "https://zkcloudworker.com",
-        sender,
-        adminKey: adminB,
-        adminContractKey: adminBKey,
-        tokenContractKey: tokenBKey,
-      });
+        await deployToken({
+          tokenSymbol: "TEST_B",
+          tokenUri: "https://zkcloudworker.com",
+          adminUri: "https://zkcloudworker.com",
+          sender,
+          adminKey: adminB,
+          adminContractKey: adminBKey,
+          tokenContractKey: tokenBKey,
+        });
 
-      await mint({
-        account: userA,
-        sender,
-        adminKey: adminA,
-        adminContractKey: adminAKey,
-        tokenContractKey: tokenAKey,
-        amount: 1000,
-      });
+        await mint({
+          account: userA,
+          sender,
+          adminKey: adminA,
+          adminContractKey: adminAKey,
+          tokenContractKey: tokenAKey,
+          amount: 1000,
+        });
 
-      await mint({
-        account: userB,
-        sender,
-        adminKey: adminB,
-        adminContractKey: adminBKey,
-        tokenContractKey: tokenBKey,
-        amount: 1000,
-      });
+        await mint({
+          account: userB,
+          sender,
+          adminKey: adminB,
+          adminContractKey: adminBKey,
+          tokenContractKey: tokenBKey,
+          amount: 1000,
+        });
 
-      await mint({
-        account: userB,
-        sender,
-        adminKey: adminA,
-        adminContractKey: adminAKey,
-        tokenContractKey: tokenAKey,
-        amount: 1,
-      });
+        await mint({
+          account: userB,
+          sender,
+          adminKey: adminA,
+          adminContractKey: adminAKey,
+          tokenContractKey: tokenAKey,
+          amount: 1,
+        });
 
-      await mint({
-        account: userA,
-        sender,
-        adminKey: adminB,
-        adminContractKey: adminBKey,
-        tokenContractKey: tokenBKey,
-        amount: 1,
-      });
-
-      await mint({
-        account: bot,
-        sender,
-        adminKey: adminA,
-        adminContractKey: adminAKey,
-        tokenContractKey: tokenAKey,
-        amount: 100,
-      });
-
-      await mint({
-        account: bot,
-        sender,
-        adminKey: adminB,
-        adminContractKey: adminBKey,
-        tokenContractKey: tokenBKey,
-        amount: 100,
-      });
+        await mint({
+          account: userA,
+          sender,
+          adminKey: adminB,
+          adminContractKey: adminBKey,
+          tokenContractKey: tokenBKey,
+          amount: 1,
+        });
+      }
 
       await fetchMinaAccount({ publicKey: sender, force: true });
       await fetchMinaAccount({ publicKey: tokenAKey, force: true });
@@ -270,47 +255,31 @@ describe("Token Offer", () => {
         tokenId: tokenAId,
         force: true,
       });
-      const swapADeploy = await Mina.transaction(
-        { sender, fee: await fee(), memo: "swap A deploy" },
+      const optionDeploy = await Mina.transaction(
+        { sender, fee: await fee(), memo: "option deploy" },
         async () => {
           AccountUpdate.fundNewAccount(sender, 1);
-          await swapA.deploy({});
-          await tokenA.approveAccountUpdate(swapA.self);
+          await option.deploy({});
+          await tokenA.approveAccountUpdate(option.self);
         }
       );
-      await swapADeploy.prove();
-      swapADeploy.sign([sender.key, swapAKey.key]);
-      await sendTx(swapADeploy, "swap A deploy");
-
-      await fetchMinaAccount({ publicKey: sender, force: true });
-      await fetchMinaAccount({ publicKey: tokenBKey, force: true });
-      await fetchMinaAccount({
-        publicKey: tokenBKey,
-        tokenId: tokenBId,
-        force: true,
-      });
-      const swapBDeploy = await Mina.transaction(
-        { sender, fee: await fee(), memo: "swap B deploy" },
-        async () => {
-          AccountUpdate.fundNewAccount(sender, 1);
-          await swapB.deploy({});
-          await tokenB.approveAccountUpdate(swapB.self);
-        }
-      );
-      await swapBDeploy.prove();
-      swapBDeploy.sign([sender.key, swapBKey.key]);
-      await sendTx(swapBDeploy, "swap B deploy");
+      await optionDeploy.prove();
+      optionDeploy.sign([sender.key, optionOfferKey.key]);
+      await sendTx(optionDeploy, "option deploy");
 
       Memory.info("deployed");
       await printBalances({
-        accounts: [userA, userB, swapAKey, swapBKey, bot],
+        accounts: [userA, userB, optionOfferKey],
         tokenId: tokenAId,
         tokenName: "TEST_A",
       });
       await printBalances({
-        accounts: [userA, userB, swapAKey, swapBKey, bot],
+        accounts: [userA, userB],
         tokenId: tokenBId,
         tokenName: "TEST_B",
+      });
+      await printBalances({
+        accounts: [userA, userB],
       });
 
       console.log("Preparing offer A tx");
@@ -327,7 +296,7 @@ describe("Token Offer", () => {
         force: true,
       });
       await fetchMinaAccount({
-        publicKey: swapAKey,
+        publicKey: optionOfferKey,
         tokenId: tokenAId,
         force: true,
       });
@@ -336,11 +305,16 @@ describe("Token Offer", () => {
         {
           sender: userA,
           fee: await fee(),
-          memo: "offer A",
+          memo: "option offer A",
         },
         async () => {
-          await swapA.offer(tokenAKey, tokenBKey, UInt64.from(10e9));
-          await tokenA.approveAccountUpdate(swapA.self);
+          await option.offer(
+            tokenAKey,
+            tokenBKey,
+            UInt64.from(10e9),
+            UInt64.from(20e9)
+          );
+          await tokenA.approveAccountUpdate(option.self);
         }
       );
       await offerATx.prove();
@@ -351,66 +325,73 @@ describe("Token Offer", () => {
       );
       await sendTx(offerATx, "offer A");
       await printBalances({
-        accounts: [userA, userB, swapAKey, swapBKey, bot],
+        accounts: [userA, userB, optionOfferKey],
         tokenId: tokenAId,
         tokenName: "TEST_A",
       });
       await printBalances({
-        accounts: [userA, userB, swapAKey, swapBKey, bot],
+        accounts: [userA, userB],
         tokenId: tokenBId,
         tokenName: "TEST_B",
       });
+      await printBalances({
+        accounts: [userA, userB],
+      });
 
-      console.log("Preparing offer B tx");
+      console.log("Preparing offer accept tx");
       await fetchMinaAccount({ publicKey: userB, force: true });
+      await fetchMinaAccount({ publicKey: userA, force: true });
+      await fetchMinaAccount({ publicKey: tokenAKey, force: true });
       await fetchMinaAccount({
-        publicKey: userB,
-        tokenId: tokenBId,
-        force: true,
-      });
-      await fetchMinaAccount({ publicKey: tokenBKey, force: true });
-      await fetchMinaAccount({
-        publicKey: tokenBKey,
-        tokenId: tokenBId,
+        publicKey: tokenAKey,
+        tokenId: tokenAId,
         force: true,
       });
       await fetchMinaAccount({
-        publicKey: swapBKey,
-        tokenId: tokenBId,
+        publicKey: optionOfferKey,
+        tokenId: tokenAId,
         force: true,
       });
 
-      const offerBTx = await Mina.transaction(
+      const offerAcceptTx = await Mina.transaction(
         {
           sender: userB,
           fee: await fee(),
-          memo: "offer B",
+          memo: "option accept",
         },
         async () => {
-          await swapB.offer(tokenBKey, tokenAKey, UInt64.from(10e9));
-          await tokenB.approveAccountUpdate(swapB.self);
+          await option.acceptOptionOffer();
+          await tokenA.approveAccountUpdate(option.self);
         }
       );
-      await offerBTx.prove();
-      offerBTx.sign([userB.key]);
+      await offerAcceptTx.prove();
+      offerAcceptTx.sign([userB.key]);
       console.log(
-        "Offer B tx au:",
-        JSON.parse(offerBTx.toJSON()).accountUpdates.length
+        "Offer accept tx au:",
+        JSON.parse(offerAcceptTx.toJSON()).accountUpdates.length
       );
-      await sendTx(offerBTx, "offer B");
+      await sendTx(offerAcceptTx, "offer accept");
       await printBalances({
-        accounts: [userA, userB, swapAKey, swapBKey, bot],
+        accounts: [userA, userB, optionOfferKey],
         tokenId: tokenAId,
         tokenName: "TEST_A",
       });
       await printBalances({
-        accounts: [userA, userB, swapAKey, swapBKey, bot],
+        accounts: [userA, userB],
         tokenId: tokenBId,
         tokenName: "TEST_B",
       });
+      await printBalances({
+        accounts: [userA, userB],
+      });
 
-      console.log("Preparing accept A tx");
-      await fetchMinaAccount({ publicKey: sender, force: true });
+      console.log("Preparing offer execute tx");
+      await fetchMinaAccount({ publicKey: userB, force: true });
+      await fetchMinaAccount({
+        publicKey: optionOfferKey,
+        tokenId: tokenAId,
+        force: true,
+      });
       await fetchMinaAccount({
         publicKey: userA,
         tokenId: tokenBId,
@@ -433,142 +414,37 @@ describe("Token Offer", () => {
         tokenId: tokenBId,
         force: true,
       });
-      await fetchMinaAccount({
-        publicKey: swapAKey,
-        tokenId: tokenAId,
-        force: true,
-      });
-      await fetchMinaAccount({
-        publicKey: swapBKey,
-        tokenId: tokenBId,
-        force: true,
-      });
-      await fetchMinaAccount({
-        publicKey: bot,
-        force: true,
-      });
-      await fetchMinaAccount({
-        publicKey: bot,
-        tokenId: tokenAId,
-        force: true,
-      });
-      await fetchMinaAccount({
-        publicKey: bot,
-        tokenId: tokenBId,
-        force: true,
-      });
 
-      const acceptTxA = await Mina.transaction(
+      const offerExecuteTx = await Mina.transaction(
         {
-          sender: bot,
+          sender: userB,
           fee: await fee(),
-          memo: "bot accept A",
+          memo: "option execute",
         },
-
         async () => {
-          await swapA.accept();
-          await tokenA.approveAccountUpdate(swapA.self);
+          await option.executeOption();
+          await tokenA.approveAccountUpdate(option.self);
         }
       );
-      await acceptTxA.prove();
-      acceptTxA.sign([bot.key]);
+      await offerExecuteTx.prove();
+      offerExecuteTx.sign([userB.key]);
       console.log(
-        "Accept A tx au:",
-        JSON.parse(acceptTxA.toJSON()).accountUpdates.length
+        "Offer execute tx au:",
+        JSON.parse(offerExecuteTx.toJSON()).accountUpdates.length
       );
-      //console.log("Accept A tx:", acceptTxA.toPretty());
-
-      await sendTx(acceptTxA, "accept A");
+      await sendTx(offerExecuteTx, "offer execute");
       await printBalances({
-        accounts: [userA, userB, swapAKey, swapBKey, bot],
+        accounts: [userA, userB, optionOfferKey],
         tokenId: tokenAId,
         tokenName: "TEST_A",
       });
       await printBalances({
-        accounts: [userA, userB, swapAKey, swapBKey, bot],
+        accounts: [userA, userB],
         tokenId: tokenBId,
         tokenName: "TEST_B",
       });
-
-      console.log("Preparing accept B tx");
-      await fetchMinaAccount({ publicKey: sender, force: true });
-      await fetchMinaAccount({
-        publicKey: userA,
-        tokenId: tokenBId,
-        force: false,
-      });
-      await fetchMinaAccount({
-        publicKey: userB,
-        tokenId: tokenAId,
-        force: false,
-      });
-      await fetchMinaAccount({ publicKey: tokenAKey, force: true });
-      await fetchMinaAccount({
-        publicKey: tokenAKey,
-        tokenId: tokenAId,
-        force: true,
-      });
-      await fetchMinaAccount({ publicKey: tokenBKey, force: true });
-      await fetchMinaAccount({
-        publicKey: tokenBKey,
-        tokenId: tokenBId,
-        force: true,
-      });
-      await fetchMinaAccount({
-        publicKey: swapAKey,
-        tokenId: tokenAId,
-        force: true,
-      });
-      await fetchMinaAccount({
-        publicKey: swapBKey,
-        tokenId: tokenBId,
-        force: true,
-      });
-      await fetchMinaAccount({
-        publicKey: bot,
-        force: true,
-      });
-      await fetchMinaAccount({
-        publicKey: bot,
-        tokenId: tokenAId,
-        force: true,
-      });
-      await fetchMinaAccount({
-        publicKey: bot,
-        tokenId: tokenBId,
-        force: true,
-      });
-
-      const acceptTxB = await Mina.transaction(
-        {
-          sender: bot,
-          fee: await fee(),
-          memo: "bot accept B",
-        },
-
-        async () => {
-          await swapB.accept();
-          await tokenB.approveAccountUpdate(swapB.self);
-        }
-      );
-      await acceptTxB.prove();
-      acceptTxB.sign([bot.key]);
-      console.log(
-        "Accept B tx au:",
-        JSON.parse(acceptTxB.toJSON()).accountUpdates.length
-      );
-      //console.log("Accept B tx:", acceptTxB.toPretty());
-
-      await sendTx(acceptTxB, "accept B");
       await printBalances({
-        accounts: [userA, userB, swapAKey, swapBKey, bot],
-        tokenId: tokenAId,
-        tokenName: "TEST_A",
-      });
-      await printBalances({
-        accounts: [userA, userB, swapAKey, swapBKey, bot],
-        tokenId: tokenBId,
-        tokenName: "TEST_B",
+        accounts: [userA, userB],
       });
     });
   }
@@ -579,6 +455,7 @@ function processArguments(): {
   compile: boolean;
   deploy: boolean;
   debugAU: boolean;
+  mint: boolean;
   send: boolean;
   useLocalCloudWorker: boolean;
 } {
@@ -591,6 +468,7 @@ function processArguments(): {
   const shouldDeploy = getArgument("deploy") ?? "true";
   const shouldSend = getArgument("send") ?? "true";
   const shouldDebug = getArgument("debugAU") ?? "false";
+  const shouldMint = getArgument("mint") ?? "true";
   const compile = getArgument("compile");
   const cloud = getArgument("cloud");
 
@@ -611,6 +489,7 @@ function processArguments(): {
     deploy: shouldDeploy === "true",
     send: shouldSend === "true",
     debugAU: shouldDebug === "true",
+    mint: shouldMint === "true",
     useLocalCloudWorker: cloud
       ? cloud === "local"
       : chainName === "local" || chainName === "lightnet",

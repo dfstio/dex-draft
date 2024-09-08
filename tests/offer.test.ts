@@ -16,42 +16,32 @@ import {
   initBlockchain,
 } from "zkcloudworker";
 import { zkcloudworker } from "..";
-import { FungibleToken } from "../src/FungibleToken";
+import { FungibleToken, setDebug } from "../src/FungibleToken";
 import { FungibleTokenAdmin } from "../src/FungibleTokenAdmin";
 import { OfferContract } from "../src/offer";
 import { BidContract } from "../src/bid";
-import { JWT, USERS_PRIVATE_KEYS, CONTRACTS_PRIVATE_KEYS } from "../env.json";
 import { sendTx, useChain } from "../src/send";
-import { AccountKey, getAccountKeys, topupAccounts } from "../src/key";
+import { AccountKey, topupAccounts } from "../src/key";
+import { getAccounts } from "../src/addresses";
 import { printAddresses, printBalances } from "../src/print";
 import { deployToken } from "../src/deploy";
 import { mint } from "../src/mint";
 
 setNumberOfWorkers(8);
 
-const { chain, compile, deploy } = processArguments();
+const { chain, compile, deploy, debug } = processArguments();
+setDebug(debug);
 
-const [sender, user, buyer, admin] = getAccountKeys({
-  names: ["sender", "user", "buyer", "admin"],
-  privateKeys: USERS_PRIVATE_KEYS,
-});
-
-const [
+const {
+  sender,
+  user,
+  buyer,
+  admin,
   tokenContractKey,
   adminContractKey,
   offerContractKey,
   bidContractKey,
-  swapContractKey,
-] = getAccountKeys({
-  names: [
-    "tokenContract",
-    "adminContract",
-    "offerContract",
-    "bidContract",
-    "swapContract",
-  ],
-  privateKeys: CONTRACTS_PRIVATE_KEYS,
-});
+} = getAccounts();
 
 const tokenContract = new FungibleToken(tokenContractKey);
 const tokenId = tokenContract.deriveTokenId();
@@ -377,8 +367,7 @@ describe("Token Offer", () => {
         async () => {
           AccountUpdate.fundNewAccount(sender, 1);
 
-          await offerContract.settle(bidContractKey, buyer);
-          await tokenContract.approveAccountUpdate(offerContract.self);
+          await bidContract.settle(user, offerContractKey);
         }
       );
       console.log(
@@ -407,6 +396,7 @@ function processArguments(): {
   compile: boolean;
   deploy: boolean;
   send: boolean;
+  debug: boolean;
   useLocalCloudWorker: boolean;
 } {
   function getArgument(arg: string): string | undefined {
@@ -419,6 +409,7 @@ function processArguments(): {
   const shouldSend = getArgument("send") ?? "true";
   const compile = getArgument("compile");
   const cloud = getArgument("cloud");
+  const shouldDebug = getArgument("debug");
 
   if (
     chainName !== "local" &&
@@ -436,6 +427,7 @@ function processArguments(): {
         : shouldDeploy === "true" || shouldSend === "true",
     deploy: shouldDeploy === "true",
     send: shouldSend === "true",
+    debug: shouldDebug === "true",
     useLocalCloudWorker: cloud
       ? cloud === "local"
       : chainName === "local" || chainName === "lightnet",

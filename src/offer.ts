@@ -65,16 +65,25 @@ export class OfferContract extends SmartContract {
     return buyerUpdate;
   }
 
-  @method async settle(bid: PublicKey, buyer: PublicKey) {
+  @method async settle(
+    bidBuyer: PublicKey,
+    offerOwner: PublicKey,
+    bidAmount: UInt64,
+    bidPrice: UInt64,
+    bid: PublicKey
+  ) {
     const amount = this.amount.getAndRequireEquals();
     const owner = this.owner.getAndRequireEquals();
     const price = this.price.getAndRequireEquals();
+    amount.assertEquals(bidAmount);
+    price.assertEquals(bidPrice);
+    owner.assertEquals(offerOwner);
     const bidContract = new BidContract(bid);
 
-    let receiver = this.send({ to: buyer, amount });
+    let receiver = this.send({ to: bidBuyer, amount });
     receiver.body.mayUseToken = AccountUpdate.MayUseToken.InheritFromParent;
     receiver.body.useFullCommitment = Bool(true);
 
-    await bidContract.settle(owner, receiver, price);
+    await bidContract.assertInsideSettle();
   }
 }

@@ -10,9 +10,16 @@ import {
   Mina,
   AccountUpdate,
   Cache,
+  PublicKey,
+  UInt8,
 } from "o1js";
+import { FungibleToken } from "../src/FungibleToken";
+import { FungibleTokenAdmin } from "../src/FungibleTokenAdmin";
 
 /**
+ * Amended from https://github.com/o1-labs/o1js/blob/main/src/examples/zkapps/joint-update.ts by
+ * deploying the A and B contracts to token accounts and adding a test case.
+ *
  * This is an example for two zkapps that are guaranteed to update their states _together_.
  *
  * So, A's state will updated if and only if B's state is updated, and vice versa.
@@ -37,6 +44,15 @@ import {
 
 const aKey = PrivateKey.randomKeypair();
 const bKey = PrivateKey.randomKeypair();
+const tokenAKey = PrivateKey.randomKeypair();
+const tokenBKey = PrivateKey.randomKeypair();
+const adminContractAKey = PrivateKey.randomKeypair();
+const adminContractBKey = PrivateKey.randomKeypair();
+const tokenA = new FungibleToken(tokenAKey.publicKey);
+const tokenB = new FungibleToken(tokenBKey.publicKey);
+const tokenIdA = tokenA.deriveTokenId();
+const tokenIdB = tokenB.deriveTokenId();
+const fee = "100000000";
 
 class A extends SmartContract {
   @state(Field) N = State(Field(0));
@@ -47,8 +63,9 @@ class A extends SmartContract {
 
     // make sure that this can only be called from `B.updateWithA()`
     // note: we need to hard-code B's pubkey for this to work, can't just take one from user input
-    let b = new B(bKey.publicKey);
+    let b = new B(bKey.publicKey, tokenIdB);
     await b.assertInsideUpdate();
+    await tokenB.approveAccountUpdate(b.self);
   }
 }
 
@@ -60,8 +77,9 @@ class B extends SmartContract {
 
   @method async updateWithA() {
     // update field N in the A account with aPubKey by incrementing by 1
-    let a = new A(aKey.publicKey);
+    let a = new A(aKey.publicKey, tokenIdA);
     await a.updateWithB();
+    await tokenA.approveAccountUpdate(a.self);
 
     // update our own state by multiplying by 2
     let twoToN = this.twoToN.getAndRequireEquals();
@@ -80,24 +98,44 @@ class B extends SmartContract {
   }
 }
 
+const a = new A(aKey.publicKey, tokenIdA);
+const b = new B(bKey.publicKey, tokenIdB);
+
 describe("Flag", () => {
   it(`should use flag`, async () => {
     const Local = await Mina.LocalBlockchain();
     Mina.setActiveInstance(Local);
-    const sender = Local.testAccounts[0];
-    const a = new A(aKey.publicKey);
-    const b = new B(bKey.publicKey);
+    const [sender, adminA, adminB, user] = Local.testAccounts;
     const cache: Cache = Cache.FileSystem("./cache");
-    await A.compile();
-    await B.compile();
+    await A.compile({ cache });
+    await B.compile({ cache });
+    await FungibleTokenAdmin.compile({ cache });
+    await FungibleToken.compile({ cache });
+    await deployToken({
+      tokenSymbol: "JOINTA",
+      sender,
+      adminKey: adminA,
+      adminContractKey: adminContractAKey,
+      tokenContractKey: tokenAKey,
+    });
+    await deployToken({
+      tokenSymbol: "JOINTB",
+      sender,
+      adminKey: adminB,
+      adminContractKey: adminContractBKey,
+      tokenContractKey: tokenBKey,
+    });
     const tx = await Mina.transaction(
-      { sender, fee: "100000000", memo: "deploy" },
+      { sender, fee, memo: "deploy" },
       async () => {
         AccountUpdate.fundNewAccount(sender, 2);
         await a.deploy({});
         await b.deploy({});
+        await tokenA.approveAccountUpdate(a.self);
+        await tokenB.approveAccountUpdate(b.self);
       }
     );
+    await tx.prove();
     await tx.sign([sender.key, aKey.privateKey, bKey.privateKey]).send();
     let N = a.N.get();
     let twoToN = b.twoToN.get();
@@ -112,6 +150,7 @@ describe("Flag", () => {
       { sender, fee: "100000000", memo: "use flag" },
       async () => {
         await b.updateWithA();
+        await tokenB.approveAccountUpdate(b.self);
       }
     );
     await tx2.prove();
@@ -133,3 +172,53 @@ describe("Flag", () => {
     });
   });
 });
+
+export async function deployToken(params: {
+  tokenSymbol: string;
+  sender: Mina.TestPublicKey;
+  adminKey: PublicKey;
+  adminContractKey: {
+    privateKey: PrivateKey;
+    publicKey: PublicKey;
+  };
+  tokenContractKey: {
+    privateKey: PrivateKey;
+    publicKey: PublicKey;
+  };
+}) {
+  const { tokenSymbol, sender, adminKey, adminContractKey, tokenContractKey } =
+    params;
+
+  const adminContract = new FungibleTokenAdmin(adminContractKey.publicKey);
+  const tokenContract = new FungibleToken(tokenContractKey.publicKey);
+
+  const tx = await Mina.transaction(
+    { sender, fee, memo: "deploy token" },
+    async () => {
+      AccountUpdate.fundNewAccount(sender, 3);
+      await adminContract.deploy({ adminPublicKey: adminKey });
+      await tokenContract.deploy({
+        symbol: tokenSymbol,
+        src: "mina-fungible-token",
+      });
+      await tokenContract.initialize(
+        adminContractKey.publicKey,
+        UInt8.from(9),
+        // We can set `startPaused` to `Bool(false)` here, because we are doing an atomic deployment
+        // If you are not deploying the admin and token contracts in the same transaction,
+        // it is safer to start the tokens paused, and resume them only after verifying that
+        // the admin contract has been deployed
+        Bool(false)
+      );
+    }
+  );
+  await tx.prove();
+  await tx
+    .sign([
+      sender.key,
+      tokenContractKey.privateKey,
+      adminContractKey.privateKey,
+    ])
+    .send()
+    .wait();
+}

@@ -1440,6 +1440,7 @@ __metadata:
     "@types/jest": "npm:^29.5.12"
     "@types/node": "npm:^22.4.1"
     jest: "npm:^29.7.0"
+    mina-fungible-token: "npm:^1.0.0"
     o1js: "npm:^1.6.0"
     ts-jest: "npm:^29.2.4"
     typescript: "npm:^5.5.4"
@@ -2730,6 +2731,15 @@ __metadata:
   version: 2.1.0
   resolution: "mimic-fn@npm:2.1.0"
   checksum: 10c0/b26f5479d7ec6cc2bce275a08f146cf78f5e7b661b18114e2506dd91ec7ec47e7a25bf4360e5438094db0560bcc868079fb3b1fb3892b833c1ecbf63f80c95a4
+  languageName: node
+  linkType: hard
+
+"mina-fungible-token@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "mina-fungible-token@npm:1.0.0"
+  peerDependencies:
+    o1js: ^1.6.0
+  checksum: 10c0/268161118a30ba0361751548b98e21c19a60e24861529cbe6213b93ff7adade9fee6f78b069bd8ca5e678b6032ea37b17df920271fb57b36655d0e7f84ae6d1d
   languageName: node
   linkType: hard
 

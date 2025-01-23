@@ -1,6 +1,6 @@
 import { Mina, AccountUpdate, UInt64, PublicKey } from "o1js";
 import { fetchMinaAccount, fee, accountBalanceMina } from "zkcloudworker";
-import { FungibleToken } from "./FungibleToken";
+import { FungibleToken } from "@minatokens/token";
 import { AccountKey } from "./key";
 import { sendTx } from "./send";
 

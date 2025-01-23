@@ -19,7 +19,7 @@ export async function printBalances(params: {
       : UInt64.from(0);
     console.log(
       `The balance of ${account.name ?? account.toBase58()}:\t${
-        balance.toBigInt() / 1_000_000_000n
+        Number(balance.toBigInt() / 1_000_000n) / 1000
       } ${tokenId ? tokenName ?? "tokens" : "MINA"}`
     );
   }

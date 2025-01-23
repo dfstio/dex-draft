@@ -10,7 +10,7 @@ import {
   SmartContract,
   Bool,
 } from "o1js";
-import { FungibleToken } from "./FungibleToken";
+import { FungibleToken } from "@minatokens/token";
 
 export class SwapOffer extends SmartContract {
   @state(PublicKey) owner = State<PublicKey>(PublicKey.empty());

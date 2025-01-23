@@ -14,12 +14,11 @@ import {
   fetchMinaAccount,
   fee,
   initBlockchain,
+  sendTx,
 } from "zkcloudworker";
-import { zkcloudworker } from "..";
-import { FungibleToken, setDebug } from "../src/FungibleToken";
-import { FungibleTokenAdmin } from "../src/FungibleTokenAdmin";
+import { FungibleToken, FungibleTokenAdmin } from "@minatokens/token";
 import { SwapOffer } from "../src/swap";
-import { sendTx, useChain } from "../src/send";
+import { useChain } from "../src/send";
 import { AccountKey, topupAccounts } from "../src/key";
 import { getAccounts } from "../src/addresses";
 import { printAddresses, printBalances } from "../src/print";
@@ -28,8 +27,7 @@ import { mint } from "../src/mint";
 
 setNumberOfWorkers(8);
 
-const { chain, compile, deploy, debugAU } = processArguments();
-setDebug(debugAU);
+const { chain, compile, deploy, debugAU, proofs } = processArguments();
 const {
   sender,
   userA,
@@ -64,18 +62,17 @@ describe("Token Offer", () => {
 
     if (chain === "local" || chain === "lightnet") {
       console.log("local chain:", chain);
-      /*
-      const { keys } = await initBlockchain(chain, 2);
+
+      const { keys } = await initBlockchain(chain, 2, proofs);
       expect(keys.length).toBeGreaterThanOrEqual(2);
       if (keys.length < 2) throw new Error("Invalid keys");
-      deployer = keys[0].key;
-      */
-      const local = await Mina.LocalBlockchain({
-        proofsEnabled: false,
-      });
-      Mina.setActiveInstance(local);
-      const topup: AccountKey = Object.assign(local.testAccounts[0], {
-        key: local.testAccounts[0].key,
+
+      // const local = await Mina.LocalBlockchain({
+      //   proofsEnabled: false,
+      // });
+      // Mina.setActiveInstance(local);
+      const topup: AccountKey = Object.assign(keys[0], {
+        key: keys[0].key,
         name: "topup",
       });
       await topupAccounts({
@@ -280,7 +277,7 @@ describe("Token Offer", () => {
       );
       await swapADeploy.prove();
       swapADeploy.sign([sender.key, swapAKey.key]);
-      await sendTx(swapADeploy, "swap A deploy");
+      await sendTx({ tx: swapADeploy, description: "swap A deploy" });
 
       await fetchMinaAccount({ publicKey: sender, force: true });
       await fetchMinaAccount({ publicKey: tokenBKey, force: true });
@@ -299,7 +296,7 @@ describe("Token Offer", () => {
       );
       await swapBDeploy.prove();
       swapBDeploy.sign([sender.key, swapBKey.key]);
-      await sendTx(swapBDeploy, "swap B deploy");
+      await sendTx({ tx: swapBDeploy, description: "swap B deploy" });
 
       Memory.info("deployed");
       await printBalances({
@@ -349,7 +346,7 @@ describe("Token Offer", () => {
         "Offer A tx au:",
         JSON.parse(offerATx.toJSON()).accountUpdates.length
       );
-      await sendTx(offerATx, "offer A");
+      await sendTx({ tx: offerATx, description: "offer A" });
       await printBalances({
         accounts: [userA, userB, swapAKey, swapBKey, bot],
         tokenId: tokenAId,
@@ -397,7 +394,7 @@ describe("Token Offer", () => {
         "Offer B tx au:",
         JSON.parse(offerBTx.toJSON()).accountUpdates.length
       );
-      await sendTx(offerBTx, "offer B");
+      await sendTx({ tx: offerBTx, description: "offer B" });
       await printBalances({
         accounts: [userA, userB, swapAKey, swapBKey, bot],
         tokenId: tokenAId,
@@ -478,7 +475,7 @@ describe("Token Offer", () => {
       );
       //console.log("Accept A tx:", acceptTxA.toPretty());
 
-      await sendTx(acceptTxA, "accept A");
+      await sendTx({ tx: acceptTxA, description: "accept A" });
       await printBalances({
         accounts: [userA, userB, swapAKey, swapBKey, bot],
         tokenId: tokenAId,
@@ -559,7 +556,7 @@ describe("Token Offer", () => {
       );
       //console.log("Accept B tx:", acceptTxB.toPretty());
 
-      await sendTx(acceptTxB, "accept B");
+      await sendTx({ tx: acceptTxB, description: "accept B" });
       await printBalances({
         accounts: [userA, userB, swapAKey, swapBKey, bot],
         tokenId: tokenAId,
@@ -581,6 +578,7 @@ function processArguments(): {
   debugAU: boolean;
   send: boolean;
   useLocalCloudWorker: boolean;
+  proofs: boolean;
 } {
   function getArgument(arg: string): string | undefined {
     const argument = process.argv.find((a) => a.startsWith("--" + arg));
@@ -593,6 +591,7 @@ function processArguments(): {
   const shouldDebug = getArgument("debugAU") ?? "false";
   const compile = getArgument("compile");
   const cloud = getArgument("cloud");
+  const proofs = getArgument("proofs") ?? "true";
 
   if (
     chainName !== "local" &&
@@ -614,5 +613,6 @@ function processArguments(): {
     useLocalCloudWorker: cloud
       ? cloud === "local"
       : chainName === "local" || chainName === "lightnet",
+    proofs: chainName === "local" ? proofs === "true" : true,
   };
 }

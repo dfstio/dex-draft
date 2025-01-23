@@ -22,8 +22,7 @@ import {
   serializeFields,
   accountBalanceMina,
 } from "zkcloudworker";
-import { FungibleToken } from "./FungibleToken";
-import { FungibleTokenAdmin } from "./FungibleTokenAdmin";
+import { FungibleToken, FungibleTokenAdmin } from "@minatokens/token";
 import { AccountKey } from "./key";
 import { sendTx } from "./send";
 
@@ -65,6 +64,7 @@ export async function deployToken(params: {
       await tokenContract.deploy({
         symbol: tokenSymbol,
         src: tokenUri,
+        allowUpdates: true,
       });
       await tokenContract.initialize(
         adminContractKey,

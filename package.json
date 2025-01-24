@@ -10,6 +10,7 @@
     "swap": "jest swap.test --chain=local --cloud=local --deploy=true --send=false --debugAU=false --proofs=false",
     "swap.devnet": "jest swap.test --chain=devnet --cloud=local --deploy=true --send=false --debugAU=false",
     "bonding": "jest bonding.test --chain=local --cloud=local --deploy=true --mint=true --redeem=true",
+    "bonding:devnet": "jest bonding.test --chain=devnet --cloud=local --deploy=true --mint=true --redeem=true",
     "option": "jest option.test --chain=local --cloud=local --deploy=true --send=false --debugAU=false",
     "option.devnet": "jest option.test --chain=devnet --cloud=local --deploy=true --send=false --debugAU=false --mint=false",
     "lightnet.deploy": "jest --chain=lightnet --cloud=local --deploy=true --send=false",

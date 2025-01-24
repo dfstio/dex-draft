@@ -47,7 +47,7 @@ let contractVerificationKey: VerificationKey;
 let adminVerificationKey: VerificationKey;
 let blockchainInitialized = false;
 
-describe("Token Offer", () => {
+describe("Bonding Curve", () => {
   it(`should initialize blockchain`, async () => {
     Memory.info("initializing blockchain");
 
@@ -154,22 +154,17 @@ describe("Token Offer", () => {
     it(`should deploy contract`, async () => {
       expect(blockchainInitialized).toBe(true);
 
-      await fetchMinaAccount({ publicKey: sender, force: true });
-      const balance = await accountBalanceMina(sender);
-      console.log("Sender balance:", balance);
-      if (balance < 5) throw new Error("Insufficient balance of sender");
+      await fetchMinaAccount({ publicKey: admin, force: true });
+      const balance = await accountBalanceMina(admin);
+      console.log("Admin balance:", balance);
+      if (balance < 20) throw new Error("Insufficient balance of sender");
 
       const tx = await Mina.transaction(
-        { sender, fee: await fee(), memo: "deploy" },
+        { sender: admin, fee: await fee(), memo: "deploy" },
         async () => {
-          AccountUpdate.fundNewAccount(sender, 4);
-          await adminContract.deploy({
-            owner: admin,
-            token: tokenContractKey,
-            feeMaster,
-          });
+          await adminContract.deploy({});
           adminContract.account.zkappUri.set("BondingCurveAdmin");
-          await adminContract.initialize();
+          adminContract.account.tokenSymbol.set("BC");
           await tokenContract.deploy({
             symbol: "TEST_A",
             src: "BondingCurve",
@@ -184,22 +179,31 @@ describe("Token Offer", () => {
             // the admin contract has been deployed
             Bool(false)
           );
+          await adminContract.initialize({
+            tokenAddress: tokenContractKey,
+            startPrice: UInt64.from(10_000),
+            curveK: UInt64.from(10_000),
+            feeMaster,
+            fee: UInt32.from(1000), // 1000 = 1%
+            launchFee: UInt64.from(10_000_000_000),
+            numberOfNewAccounts: UInt64.from(4),
+          });
         }
       );
       await tx.prove();
-      tx.sign([sender.key, tokenContractKey.key, adminContractKey.key]);
+      tx.sign([admin.key, tokenContractKey.key, adminContractKey.key]);
       await sendTx({ tx, description: "deploy" });
     });
   }
 
   if (mint) {
-    it(`should mint tokens`, async () => {
+    it(`should mint tokens by admin`, async () => {
       await printBalances({
         accounts: [user, admin, adminContractKey, feeMaster],
         tokenName: "MINA",
       });
 
-      await fetchMinaAccount({ publicKey: user, force: true });
+      await fetchMinaAccount({ publicKey: admin, force: true });
       await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
       await fetchMinaAccount({
         publicKey: tokenContractKey,
@@ -213,24 +217,24 @@ describe("Token Offer", () => {
         force: true,
       });
       const mint = await Mina.transaction(
-        { sender: user, fee: await fee(), memo: "mint" },
+        { sender: admin, fee: await fee(), memo: "mint by admin" },
         async () => {
           await adminContract.mint(
+            user,
             UInt64.from(100_000_000_000_000),
             UInt64.from(10_000)
           );
-          //await tokenContract.approveAccountUpdate(tokenContract.self);
         }
       );
       await mint.prove();
-      mint.sign([user.key]);
-      await sendTx({ tx: mint, description: "mint" });
+      mint.sign([admin.key]);
+      await sendTx({ tx: mint, description: "mint by admin" });
       await printBalances({
         accounts: [user, admin, adminContractKey, feeMaster],
         tokenName: "MINA",
       });
       await printBalances({
-        accounts: [user, adminContractKey],
+        accounts: [user, admin, adminContractKey],
         tokenId,
         tokenName: "TEST_A",
       });
@@ -239,7 +243,80 @@ describe("Token Offer", () => {
         tokenId: adminTokenId,
         tokenName: "ADMIN",
       });
+    });
 
+    it(`should burn tokens by user`, async () => {
+      await fetchMinaAccount({ publicKey: user, force: true });
+      await fetchMinaAccount({ publicKey: user, tokenId, force: true });
+      await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
+      await fetchMinaAccount({
+        publicKey: tokenContractKey,
+        tokenId,
+        force: true,
+      });
+      await fetchMinaAccount({ publicKey: adminContractKey, force: true });
+      await fetchMinaAccount({
+        publicKey: adminContractKey,
+        tokenId: adminTokenId,
+        force: true,
+      });
+      await printBalances({
+        accounts: [user, admin, adminContractKey],
+        tokenId,
+        tokenName: "TEST_A",
+      });
+      const tx = await Mina.transaction(
+        { sender: user, fee: await fee(), memo: "burn by user" },
+        async () => {
+          await tokenContract.burn(user, UInt64.from(50_000_000_000_000));
+        }
+      );
+      await tx.prove();
+      tx.sign([user.key]);
+      await sendTx({ tx, description: "burn by user" });
+      await printBalances({
+        accounts: [user, admin, adminContractKey],
+        tokenId,
+        tokenName: "TEST_A",
+      });
+    });
+
+    it(`should sync`, async () => {
+      await fetchMinaAccount({ publicKey: user, force: true });
+      await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
+      await fetchMinaAccount({
+        publicKey: tokenContractKey,
+        tokenId,
+        force: true,
+      });
+      await fetchMinaAccount({ publicKey: adminContractKey, force: true });
+      await fetchMinaAccount({
+        publicKey: adminContractKey,
+        tokenId: adminTokenId,
+        force: true,
+      });
+      await printBalances({
+        accounts: [adminContractKey],
+        tokenId: adminTokenId,
+        tokenName: "ADMIN",
+      });
+      const tx = await Mina.transaction(
+        { sender: user, fee: await fee(), memo: "sync" },
+        async () => {
+          await adminContract.sync();
+        }
+      );
+      await tx.prove();
+      tx.sign([user.key]);
+      await sendTx({ tx, description: "sync" });
+      await printBalances({
+        accounts: [adminContractKey],
+        tokenId: adminTokenId,
+        tokenName: "ADMIN",
+      });
+    });
+
+    it(`should mint tokens by user`, async () => {
       await fetchMinaAccount({ publicKey: user, force: true });
       await fetchMinaAccount({ publicKey: user, tokenId, force: true });
       await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
@@ -255,23 +332,24 @@ describe("Token Offer", () => {
         force: true,
       });
       const mint2 = await Mina.transaction(
-        { sender: user, fee: await fee(), memo: "mint2" },
+        { sender: user, fee: await fee(), memo: "mint by user" },
         async () => {
           await adminContract.mint(
+            user,
             UInt64.from(200_000_000_000_000),
-            UInt64.from(25_000)
+            UInt64.from(20_000)
           );
         }
       );
       await mint2.prove();
       mint2.sign([user.key]);
-      await sendTx({ tx: mint2, description: "mint2" });
+      await sendTx({ tx: mint2, description: "mint by user" });
       await printBalances({
         accounts: [user, admin, adminContractKey, feeMaster],
         tokenName: "MINA",
       });
       await printBalances({
-        accounts: [user, adminContractKey],
+        accounts: [user, admin, adminContractKey],
         tokenId,
         tokenName: "TEST_A",
       });
@@ -285,9 +363,15 @@ describe("Token Offer", () => {
 
   if (redeem) {
     it(`should redeem tokens`, async () => {
+      console.log("redeeming tokens");
       await printBalances({
         accounts: [user, admin, adminContractKey, feeMaster],
         tokenName: "MINA",
+      });
+      await printBalances({
+        accounts: [adminContractKey],
+        tokenId: adminTokenId,
+        tokenName: "ADMIN",
       });
 
       await fetchMinaAccount({ publicKey: user, force: true });
@@ -304,6 +388,10 @@ describe("Token Offer", () => {
         tokenId: adminTokenId,
         force: true,
       });
+      const account = Mina.getAccount(adminContractKey, adminTokenId);
+      const balance = account.balance;
+      console.log("balance", balance.toBigInt());
+
       const redeem = await Mina.transaction(
         { sender: user, fee: await fee(), memo: "redeem" },
         async () => {
@@ -322,7 +410,7 @@ describe("Token Offer", () => {
         tokenName: "MINA",
       });
       await printBalances({
-        accounts: [user, adminContractKey],
+        accounts: [user, admin, adminContractKey],
         tokenId,
         tokenName: "TEST_A",
       });

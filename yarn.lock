@@ -728,27 +728,27 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@minatokens/storage@npm:^0.15.2":
-  version: 0.15.2
-  resolution: "@minatokens/storage@npm:0.15.2"
+"@minatokens/storage@npm:^0.15.3":
+  version: 0.15.3
+  resolution: "@minatokens/storage@npm:0.15.3"
   dependencies:
     tslib: "npm:^2.8.1"
   peerDependencies:
     o1js: ^2.2.0
-  checksum: 10c0/956f53d91fb21a3307cee7d59c9ad250f8bd78f01198ca86dc76296708d87739a4e6ff86ef3368674c71f09e3855eec8f06045dc065fc6026e6358573bbfc9cd
+  checksum: 10c0/d8efe72a1c1f863db37337bb0f9368eec875d55ec20fcd9ddf6f34d41821bc16241281ca0aeb27633fa4113fa40b0f92b5dae25e04cd2fd6e6ba2473e9100608
   languageName: node
   linkType: hard
 
-"@minatokens/token@npm:^0.15.2":
-  version: 0.15.2
-  resolution: "@minatokens/token@npm:0.15.2"
+"@minatokens/token@npm:^0.15.3":
+  version: 0.15.3
+  resolution: "@minatokens/token@npm:0.15.3"
   dependencies:
     tslib: "npm:^2.8.1"
   peerDependencies:
-    "@minatokens/api": 0.15.2
-    "@minatokens/storage": 0.15.2
+    "@minatokens/api": 0.15.3
+    "@minatokens/storage": 0.15.3
     o1js: ^2.2.0
-  checksum: 10c0/15a4bbdd8442c1e9dc8204b976d79166b936dbf536a393a6c926da34992fdd6a864cdc9553713bca412bff18eb68b099b716310e4b74cacdf0bf308ed680148f
+  checksum: 10c0/0b2a381d5dea7cd526b147253fb420afd39dc0d9b37848df7b5b53286991ee8d0566bd6e0c78b83c2389f41788aad77370331d1c0cacd478ee85274085ae67bf
   languageName: node
   linkType: hard
 
@@ -900,12 +900,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:^22.10.9":
-  version: 22.10.9
-  resolution: "@types/node@npm:22.10.9"
+"@types/node@npm:^22.10.10":
+  version: 22.10.10
+  resolution: "@types/node@npm:22.10.10"
   dependencies:
     undici-types: "npm:~6.20.0"
-  checksum: 10c0/ed2d7b2cf20ce520e04711eab48e9cd7d6a835d2859fbdc5d9a8c5e00a97c1f872a409f789783c473062b29beaf1cddf4b1c7ad03ae3fe433b072b7cf9fff741
+  checksum: 10c0/3425772d4513cd5dbdd87c00acda088113c03a97445f84f6a89744c60a66990b56c9d3a7213d09d57b6b944ae8ff45f985565e0c1846726112588e33a22dd12b
   languageName: node
   linkType: hard
 
@@ -1452,10 +1452,10 @@ __metadata:
   resolution: "dex-draft@workspace:."
   dependencies:
     "@jest/globals": "npm:^29.7.0"
-    "@minatokens/storage": "npm:^0.15.2"
-    "@minatokens/token": "npm:^0.15.2"
+    "@minatokens/storage": "npm:^0.15.3"
+    "@minatokens/token": "npm:^0.15.3"
     "@types/jest": "npm:^29.5.14"
-    "@types/node": "npm:^22.10.9"
+    "@types/node": "npm:^22.10.10"
     jest: "npm:^29.7.0"
     mina-fungible-token: "npm:^1.1.0"
     o1js: "npm:^2.2.0"

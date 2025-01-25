@@ -24,15 +24,15 @@
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.10.9",
+    "@types/node": "^22.10.10",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
     "typescript": "^5.7.3"
   },
   "packageManager": "yarn@4.4.0",
   "dependencies": {
-    "@minatokens/storage": "^0.15.2",
-    "@minatokens/token": "^0.15.2",
+    "@minatokens/storage": "^0.15.3",
+    "@minatokens/token": "^0.15.3",
     "mina-fungible-token": "^1.1.0",
     "o1js": "^2.2.0",
     "zkcloudworker": "^0.23.14"

@@ -19,7 +19,10 @@ import {
   sendTx,
   accountBalanceMina,
 } from "zkcloudworker";
-import { BondingCurveFungibleToken, BondingCurveAdmin } from "../src/bonding";
+import {
+  BondingCurveFungibleToken,
+  BondingCurveAdmin,
+} from "@minatokens/token";
 import { AccountKey, topupAccounts } from "../src/key";
 import { getAccounts } from "../src/addresses";
 import { printAddresses, printBalances } from "../src/print";
@@ -396,7 +399,7 @@ describe("Bonding Curve", () => {
         { sender: user, fee: await fee(), memo: "redeem" },
         async () => {
           await adminContract.redeem(
-            UInt64.from(300_000_000_000_000),
+            UInt64.from(250_000_000_000_000),
             UInt64.from(15_000),
             UInt32.from(50)
           );

@@ -172,6 +172,13 @@ export class BondingCurveAdmin
       }).pack()
     );
 
+    /*
+      We cannot constrain the circulating supply of the token,
+      as the error Can't transfer to/from the circulation account
+      is thrown for ANY AccountUpdate for the circulation tracking account
+      so we keep the copy if the circulation amount  here and sync sometimes
+      in the case the user burns tokens without calling the redeem method
+    */
     const supplyUpdate = AccountUpdate.createSigned(
       this.address,
       this.deriveTokenId()

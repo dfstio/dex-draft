@@ -1,5 +1,6 @@
 import { AccountKey, getAccountKeys } from "./key";
 import { USERS_PRIVATE_KEYS, CONTRACTS_PRIVATE_KEYS } from "../env.json";
+import { PrivateKey } from "o1js";
 
 export function getAccounts(): {
   sender: AccountKey;
@@ -11,6 +12,7 @@ export function getAccounts(): {
   userA: AccountKey;
   userB: AccountKey;
   bot: AccountKey;
+  feeMaster: AccountKey;
   tokenContractKey: AccountKey;
   adminContractKey: AccountKey;
   offerContractKey: AccountKey;
@@ -23,21 +25,32 @@ export function getAccounts(): {
   swapBKey: AccountKey;
   optionOfferKey: AccountKey;
 } {
-  const [sender, user, buyer, admin, adminA, adminB, userA, userB, bot] =
-    getAccountKeys({
-      names: [
-        "sender",
-        "user",
-        "buyer",
-        "admin",
-        "adminA",
-        "adminB",
-        "userA",
-        "userB",
-        "bot",
-      ],
-      privateKeys: USERS_PRIVATE_KEYS,
-    });
+  const [
+    sender,
+    user,
+    buyer,
+    admin,
+    adminA,
+    adminB,
+    userA,
+    userB,
+    bot,
+    feeMaster,
+  ] = getAccountKeys({
+    names: [
+      "sender",
+      "user",
+      "buyer",
+      "admin",
+      "adminA",
+      "adminB",
+      "userA",
+      "userB",
+      "bot",
+      "feeMaster",
+    ],
+    privateKeys: USERS_PRIVATE_KEYS,
+  });
 
   const [
     tokenContractKey,
@@ -65,7 +78,10 @@ export function getAccounts(): {
       "swapB",
       "option",
     ],
-    privateKeys: CONTRACTS_PRIVATE_KEYS,
+    privateKeys: Array(15)
+      .fill("")
+      .map((_) => PrivateKey.random().toBase58()),
+    //CONTRACTS_PRIVATE_KEYS,
   });
   return {
     sender,
@@ -77,6 +93,7 @@ export function getAccounts(): {
     userA,
     userB,
     bot,
+    feeMaster,
     tokenContractKey,
     adminContractKey,
     offerContractKey,

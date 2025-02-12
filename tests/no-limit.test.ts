@@ -9,6 +9,7 @@ import {
   Bool,
   UInt8,
   UInt32,
+  PrivateKey,
 } from "o1js";
 import {
   blockchain,
@@ -28,6 +29,7 @@ import { getAccounts } from "../src/addresses";
 import { printAddresses, printBalances } from "../src/print";
 
 setNumberOfWorkers(8);
+const NUMBER_OF_TRANSFERS = 500;
 
 const { chain, compile, deploy, mint, redeem } = processArguments();
 
@@ -55,23 +57,57 @@ describe("Bonding Curve", () => {
     Memory.info("initializing blockchain");
 
     if (chain === "local" || chain === "lightnet") {
+      const Local = await Mina.LocalBlockchain({
+        enforceTransactionLimits: false,
+        proofsEnabled: true,
+      });
+      Mina.setActiveInstance(Local);
       console.log("local chain:", chain);
-      const { keys } = await initBlockchain(chain, 2);
-      expect(keys.length).toBeGreaterThanOrEqual(2);
-      if (keys.length < 2) throw new Error("Invalid keys");
-      const topup: AccountKey = Object.assign(keys[0], {
-        key: keys[0].key,
+      //const { keys } = await initBlockchain(chain, 2);
+      //expect(keys.length).toBeGreaterThanOrEqual(2);
+      //if (keys.length < 2) throw new Error("Invalid keys");
+      const topup: AccountKey = Object.assign(Local.testAccounts[0], {
+        key: Local.testAccounts[0].key,
         name: "topup",
       });
       await topupAccounts({
         accounts: [sender, user, buyer, admin, feeMaster],
         sender: topup,
         amountInMina: 100,
+        chain: "local",
+      });
+      console.log("test accounts", Local.testAccounts.length);
+      let txTopup = await Mina.transaction(
+        {
+          sender: topup,
+          fee: 100_000_000,
+          memo: `topup 2`,
+        },
+        async () => {
+          for (let index = 1; index < Local.testAccounts.length; index++) {
+            const accountUpdate = AccountUpdate.create(
+              Local.testAccounts[index]
+            );
+            accountUpdate.requireSignature();
+            accountUpdate.send({
+              to: admin,
+              amount: UInt64.from(1000_000_000_000),
+            });
+          }
+        }
+      );
+      txTopup.sign(Local.testAccounts.map((account) => account.key));
+      await sendTx({
+        tx: txTopup,
+        wait: true,
+        description: "topup 2",
+        chain: "local",
       });
     } else {
       console.log("non-local chain:", chain);
       await initBlockchain(chain);
     }
+
     await printAddresses([
       sender,
       user,
@@ -196,14 +232,14 @@ describe("Bonding Curve", () => {
       );
       await tx.prove();
       tx.sign([admin.key, tokenContractKey.key, adminContractKey.key]);
-      await sendTx({ tx, description: "deploy" });
+      await sendTx({ tx, description: "deploy", chain: "local" });
     });
   }
 
   if (mint) {
     it(`should mint tokens by admin`, async () => {
       await printBalances({
-        accounts: [user, admin, adminContractKey, feeMaster],
+        accounts: [admin, adminContractKey, feeMaster],
         tokenName: "MINA",
       });
 
@@ -220,25 +256,41 @@ describe("Bonding Curve", () => {
         tokenId: adminTokenId,
         force: true,
       });
+      console.time("build tx");
       const mint = await Mina.transaction(
-        { sender: admin, fee: await fee(), memo: "mint by admin" },
+        {
+          sender: admin,
+          fee: 100_000_000,
+          memo: "mint by admin",
+        },
         async () => {
           await adminContract.mint(
-            user,
-            UInt64.from(100_000_000_000_000),
+            admin,
+            UInt64.from(1_000_000_000_000_000),
             UInt64.from(10_000)
           );
         }
       );
+      console.timeEnd("build tx");
+      console.time("prove tx");
       await mint.prove();
+      console.timeEnd("prove tx");
+      console.time("sign tx");
       mint.sign([admin.key]);
-      await sendTx({ tx: mint, description: "mint by admin" });
+      console.timeEnd("sign tx");
+      console.time("send tx");
+      await sendTx({
+        tx: mint,
+        description: `mint by admin`,
+        chain: "local",
+      });
+      console.timeEnd("send tx");
       await printBalances({
-        accounts: [user, admin, adminContractKey, feeMaster],
+        accounts: [admin, adminContractKey, feeMaster],
         tokenName: "MINA",
       });
       await printBalances({
-        accounts: [user, admin, adminContractKey],
+        accounts: [admin, adminContractKey],
         tokenId,
         tokenName: "TEST_A",
       });
@@ -248,10 +300,13 @@ describe("Bonding Curve", () => {
         tokenName: "ADMIN",
       });
     });
+    it(`should mint tokens by admin`, async () => {
+      await printBalances({
+        accounts: [admin, adminContractKey, feeMaster],
+        tokenName: "MINA",
+      });
 
-    it(`should burn tokens by user`, async () => {
-      await fetchMinaAccount({ publicKey: user, force: true });
-      await fetchMinaAccount({ publicKey: user, tokenId, force: true });
+      await fetchMinaAccount({ publicKey: admin, force: true });
       await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
       await fetchMinaAccount({
         publicKey: tokenContractKey,
@@ -264,157 +319,50 @@ describe("Bonding Curve", () => {
         tokenId: adminTokenId,
         force: true,
       });
-      await printBalances({
-        accounts: [user, admin, adminContractKey],
-        tokenId,
-        tokenName: "TEST_A",
-      });
-      const tx = await Mina.transaction(
-        { sender: user, fee: await fee(), memo: "burn by user" },
+      Memory.info("before transfer tx build");
+      console.time("build tx");
+      const mint = await Mina.transaction(
+        {
+          sender: admin,
+          fee: 100_000_000 * NUMBER_OF_TRANSFERS,
+          memo: "transfer by admin",
+        },
         async () => {
-          await tokenContract.burn(user, UInt64.from(50_000_000_000_000));
+          AccountUpdate.fundNewAccount(admin, NUMBER_OF_TRANSFERS);
+          for (let i = 0; i < NUMBER_OF_TRANSFERS; i++) {
+            const user = PrivateKey.random().toPublicKey();
+            await tokenContract.transfer(
+              admin,
+              user,
+              UInt64.from(1_000_000_000)
+            );
+          }
         }
       );
-      await tx.prove();
-      tx.sign([user.key]);
-      await sendTx({ tx, description: "burn by user" });
+      console.timeEnd("build tx");
+      Memory.info("before transfer tx prove");
+      console.time("prove tx");
+      await mint.prove();
+      console.timeEnd("prove tx");
+      Memory.info("before transfer tx sign");
+      console.time("sign tx");
+      mint.sign([admin.key]);
+      console.timeEnd("sign tx");
+      Memory.info("before transfer tx send");
+      console.time("send tx");
+      await sendTx({
+        tx: mint,
+        description: `transfer by admin: ${NUMBER_OF_TRANSFERS} users`,
+        chain: "local",
+      });
+      console.timeEnd("send tx");
+      Memory.info("after transfer tx send");
       await printBalances({
-        accounts: [user, admin, adminContractKey],
-        tokenId,
-        tokenName: "TEST_A",
-      });
-    });
-
-    it(`should sync`, async () => {
-      await fetchMinaAccount({ publicKey: user, force: true });
-      await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
-      await fetchMinaAccount({
-        publicKey: tokenContractKey,
-        tokenId,
-        force: true,
-      });
-      await fetchMinaAccount({ publicKey: adminContractKey, force: true });
-      await fetchMinaAccount({
-        publicKey: adminContractKey,
-        tokenId: adminTokenId,
-        force: true,
-      });
-      await printBalances({
-        accounts: [adminContractKey],
-        tokenId: adminTokenId,
-        tokenName: "ADMIN",
-      });
-      const tx = await Mina.transaction(
-        { sender: user, fee: await fee(), memo: "sync" },
-        async () => {
-          await adminContract.sync();
-        }
-      );
-      await tx.prove();
-      tx.sign([user.key]);
-      await sendTx({ tx, description: "sync" });
-      await printBalances({
-        accounts: [adminContractKey],
-        tokenId: adminTokenId,
-        tokenName: "ADMIN",
-      });
-    });
-
-    it(`should mint tokens by user`, async () => {
-      await fetchMinaAccount({ publicKey: user, force: true });
-      await fetchMinaAccount({ publicKey: user, tokenId, force: true });
-      await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
-      await fetchMinaAccount({
-        publicKey: tokenContractKey,
-        tokenId,
-        force: true,
-      });
-      await fetchMinaAccount({ publicKey: adminContractKey, force: true });
-      await fetchMinaAccount({
-        publicKey: adminContractKey,
-        tokenId: adminTokenId,
-        force: true,
-      });
-      const mint2 = await Mina.transaction(
-        { sender: user, fee: await fee(), memo: "mint by user" },
-        async () => {
-          await adminContract.mint(
-            user,
-            UInt64.from(200_000_000_000_000),
-            UInt64.from(20_000)
-          );
-        }
-      );
-      await mint2.prove();
-      mint2.sign([user.key]);
-      await sendTx({ tx: mint2, description: "mint by user" });
-      await printBalances({
-        accounts: [user, admin, adminContractKey, feeMaster],
+        accounts: [admin, adminContractKey, feeMaster],
         tokenName: "MINA",
       });
       await printBalances({
-        accounts: [user, admin, adminContractKey],
-        tokenId,
-        tokenName: "TEST_A",
-      });
-      await printBalances({
-        accounts: [adminContractKey],
-        tokenId: adminTokenId,
-        tokenName: "ADMIN",
-      });
-    });
-  }
-
-  if (redeem) {
-    it(`should redeem tokens`, async () => {
-      console.log("redeeming tokens");
-      await printBalances({
-        accounts: [user, admin, adminContractKey, feeMaster],
-        tokenName: "MINA",
-      });
-      await printBalances({
-        accounts: [adminContractKey],
-        tokenId: adminTokenId,
-        tokenName: "ADMIN",
-      });
-
-      await fetchMinaAccount({ publicKey: user, force: true });
-      await fetchMinaAccount({ publicKey: user, tokenId, force: true });
-      await fetchMinaAccount({ publicKey: tokenContractKey, force: true });
-      await fetchMinaAccount({
-        publicKey: tokenContractKey,
-        tokenId,
-        force: true,
-      });
-      await fetchMinaAccount({ publicKey: adminContractKey, force: true });
-      await fetchMinaAccount({
-        publicKey: adminContractKey,
-        tokenId: adminTokenId,
-        force: true,
-      });
-      const account = Mina.getAccount(adminContractKey, adminTokenId);
-      const balance = account.balance;
-      console.log("balance", balance.toBigInt());
-
-      const redeem = await Mina.transaction(
-        { sender: user, fee: await fee(), memo: "redeem" },
-        async () => {
-          await adminContract.redeem(
-            UInt64.from(250_000_000_000_000),
-            UInt64.from(15_000),
-            UInt32.from(50)
-          );
-        }
-      );
-      await redeem.prove();
-      redeem.sign([user.key]);
-      await sendTx({ tx: redeem, description: "redeem" });
-      await printBalances({
-        accounts: [user, admin, adminContractKey, feeMaster],
-        tokenName: "MINA",
-      });
-      await printBalances({
-        accounts: [user, admin, adminContractKey],
+        accounts: [admin, adminContractKey],
         tokenId,
         tokenName: "TEST_A",
       });

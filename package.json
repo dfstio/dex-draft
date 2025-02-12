@@ -10,6 +10,7 @@
     "swap": "jest swap.test --chain=local --cloud=local --deploy=true --send=false --debugAU=false --proofs=false",
     "swap.devnet": "jest swap.test --chain=devnet --cloud=local --deploy=true --send=false --debugAU=false",
     "bonding": "jest bonding.test --chain=local --cloud=local --deploy=true --mint=true --redeem=true",
+    "no-limit": "jest no-limit.test --chain=local --cloud=local --deploy=true --mint=true --redeem=true",
     "bonding:devnet": "jest bonding.test --chain=devnet --cloud=local --deploy=true --mint=true --redeem=true",
     "option": "jest option.test --chain=local --cloud=local --deploy=true --send=false --debugAU=false",
     "option.devnet": "jest option.test --chain=devnet --cloud=local --deploy=true --send=false --debugAU=false --mint=false",
@@ -24,18 +25,18 @@
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.10.10",
+    "@types/node": "^22.13.1",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
     "typescript": "^5.7.3"
   },
   "packageManager": "yarn@4.4.0",
   "dependencies": {
-    "@minatokens/storage": "^0.15.3",
-    "@minatokens/token": "^0.15.3",
+    "@minatokens/storage": "^0.16.16",
+    "@minatokens/token": "^0.16.16",
     "mina-fungible-token": "^1.1.0",
     "o1js": "^2.2.0",
-    "zkcloudworker": "^0.23.14"
+    "zkcloudworker": "^0.24.3"
   },
   "jest": {
     "preset": "ts-jest",

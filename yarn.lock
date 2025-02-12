@@ -719,36 +719,36 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@minatokens/api@npm:^0.9.7":
-  version: 0.9.7
-  resolution: "@minatokens/api@npm:0.9.7"
+"@minatokens/api@npm:^0.16.5":
+  version: 0.16.11
+  resolution: "@minatokens/api@npm:0.16.11"
   dependencies:
     "@hey-api/client-fetch": "npm:^0.5.6"
-  checksum: 10c0/3e5ea54612881f644df410317634910d16b5872feb81967e5a144a5d271fee986c1684adee096b46c3369d19847f8561e4bdc5fddf7ea88c3e8cb0d71ca1f245
+  checksum: 10c0/e935599f1617e9ab7d744755c9888640c92333b858dc67ded4eaa74aac7882520e348ffef75688b4352b9710a11b1c1a5554d62931739e47c36c19146d44de9c
   languageName: node
   linkType: hard
 
-"@minatokens/storage@npm:^0.15.3":
-  version: 0.15.3
-  resolution: "@minatokens/storage@npm:0.15.3"
+"@minatokens/storage@npm:^0.16.16":
+  version: 0.16.16
+  resolution: "@minatokens/storage@npm:0.16.16"
   dependencies:
     tslib: "npm:^2.8.1"
   peerDependencies:
     o1js: ^2.2.0
-  checksum: 10c0/d8efe72a1c1f863db37337bb0f9368eec875d55ec20fcd9ddf6f34d41821bc16241281ca0aeb27633fa4113fa40b0f92b5dae25e04cd2fd6e6ba2473e9100608
+  checksum: 10c0/0bfe1f1c548196c514741bae1f2df9a429b2be518151e2b874c6549957e3202dc406ab316596e2f68e39739ddc4d429036fbb11612a4727e055bda6b4cee5bd5
   languageName: node
   linkType: hard
 
-"@minatokens/token@npm:^0.15.3":
-  version: 0.15.3
-  resolution: "@minatokens/token@npm:0.15.3"
+"@minatokens/token@npm:^0.16.16":
+  version: 0.16.16
+  resolution: "@minatokens/token@npm:0.16.16"
   dependencies:
     tslib: "npm:^2.8.1"
   peerDependencies:
-    "@minatokens/api": 0.15.3
-    "@minatokens/storage": 0.15.3
+    "@minatokens/api": 0.16.16
+    "@minatokens/storage": 0.16.16
     o1js: ^2.2.0
-  checksum: 10c0/0b2a381d5dea7cd526b147253fb420afd39dc0d9b37848df7b5b53286991ee8d0566bd6e0c78b83c2389f41788aad77370331d1c0cacd478ee85274085ae67bf
+  checksum: 10c0/cb0d8b673fb6f67c51a40cc1868dcc616468cd618b1f4566cb4e34c88d5cae763d95d27541f4f3e4a236193edf3f22ff1f482d710d37e83670f8fae17abbe489
   languageName: node
   linkType: hard
 
@@ -900,12 +900,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:^22.10.10":
-  version: 22.10.10
-  resolution: "@types/node@npm:22.10.10"
+"@types/node@npm:^22.13.1":
+  version: 22.13.1
+  resolution: "@types/node@npm:22.13.1"
   dependencies:
     undici-types: "npm:~6.20.0"
-  checksum: 10c0/3425772d4513cd5dbdd87c00acda088113c03a97445f84f6a89744c60a66990b56c9d3a7213d09d57b6b944ae8ff45f985565e0c1846726112588e33a22dd12b
+  checksum: 10c0/d4e56d41d8bd53de93da2651c0a0234e330bd7b1b6d071b1a94bd3b5ee2d9f387519e739c52a15c1faa4fb9d97e825b848421af4b2e50e6518011e7adb4a34b7
   languageName: node
   linkType: hard
 
@@ -1452,16 +1452,16 @@ __metadata:
   resolution: "dex-draft@workspace:."
   dependencies:
     "@jest/globals": "npm:^29.7.0"
-    "@minatokens/storage": "npm:^0.15.3"
-    "@minatokens/token": "npm:^0.15.3"
+    "@minatokens/storage": "npm:^0.16.16"
+    "@minatokens/token": "npm:^0.16.16"
     "@types/jest": "npm:^29.5.14"
-    "@types/node": "npm:^22.10.10"
+    "@types/node": "npm:^22.13.1"
     jest: "npm:^29.7.0"
     mina-fungible-token: "npm:^1.1.0"
     o1js: "npm:^2.2.0"
     ts-jest: "npm:^29.2.5"
     typescript: "npm:^5.7.3"
-    zkcloudworker: "npm:^0.23.14"
+    zkcloudworker: "npm:^0.24.3"
   languageName: unknown
   linkType: soft
 
@@ -3817,14 +3817,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zkcloudworker@npm:^0.23.14":
-  version: 0.23.14
-  resolution: "zkcloudworker@npm:0.23.14"
+"zkcloudworker@npm:^0.24.3":
+  version: 0.24.3
+  resolution: "zkcloudworker@npm:0.24.3"
   dependencies:
-    "@minatokens/api": "npm:^0.9.7"
+    "@minatokens/api": "npm:^0.16.5"
     chalk: "npm:^4.1.2"
   peerDependencies:
     o1js: ^2.1.0
-  checksum: 10c0/745420e3abb99cfe7c9c03df6221b61e4808641452ce4d13e243eb25e1e8536ea638ce46eab70dae8edd4e8f5969d247e6db7acbe1e4a57ec406feadb9777142
+  checksum: 10c0/e91521edadfc9b858d3783798b95740ee27a916f054648dbf353178a68c31f257df325ac8650f20b30f8dfc106ec0601c4f140b85cdd46c704c2d303ef3954a0
   languageName: node
   linkType: hard

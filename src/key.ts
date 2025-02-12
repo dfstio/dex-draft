@@ -1,5 +1,10 @@
 import { PublicKey, PrivateKey, Mina, AccountUpdate } from "o1js";
-import { accountBalanceMina, fetchMinaAccount, fee } from "zkcloudworker";
+import {
+  accountBalanceMina,
+  fetchMinaAccount,
+  fee,
+  blockchain,
+} from "zkcloudworker";
 import { sendTx } from "./send";
 
 export type AccountKey = PublicKey & {
@@ -72,8 +77,9 @@ export async function topupAccounts(params: {
   accounts: PublicKey[];
   sender: AccountKey;
   amountInMina: number; // MINA
+  chain?: blockchain;
 }) {
-  const { accounts, sender, amountInMina } = params;
+  const { accounts, sender, amountInMina, chain } = params;
   const amount = amountInMina * 1e9;
   await fetchMinaAccount({ publicKey: sender, force: true });
   let nonce = Number(Mina.getAccount(sender).nonce.toBigint());
@@ -97,7 +103,8 @@ export async function topupAccounts(params: {
       await sendTx(
         topupTx,
         `topup ${to.toBase58()}`,
-        i === accounts.length - 1
+        i === accounts.length - 1,
+        chain
       );
     }
   }

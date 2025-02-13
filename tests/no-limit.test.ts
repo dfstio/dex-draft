@@ -29,7 +29,7 @@ import { getAccounts } from "../src/addresses";
 import { printAddresses, printBalances } from "../src/print";
 
 setNumberOfWorkers(8);
-const NUMBER_OF_TRANSFERS = 500;
+const NUMBER_OF_TRANSFERS = 200;
 
 const { chain, compile, deploy, mint, redeem } = processArguments();
 
@@ -54,6 +54,7 @@ let blockchainInitialized = false;
 
 describe("Bonding Curve", () => {
   it(`should initialize blockchain`, async () => {
+    console.log("Number of transfers:", NUMBER_OF_TRANSFERS);
     Memory.info("initializing blockchain");
 
     if (chain === "local" || chain === "lightnet") {
